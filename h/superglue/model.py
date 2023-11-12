@@ -90,6 +90,8 @@ class superglue(torch.nn.Module):
         self.edges_intra = generate_edges_intra(50, 50)
         self.edges_cross = generate_edges_cross(50, 50)
 
+        import
+
         self.mlp1 = torch.nn.Linear(256, 128, bias=True).cuda()
         self.mlp2 = torch.nn.Linear(256, 128, bias=True).cuda()
         self.mlp3 = torch.nn.Linear(256, 128, bias=True).cuda()
