@@ -1,4 +1,4 @@
-y/COCO2014
-y/dump_match_pairs/*
+scripts/COCO2014
+scripts/dump_match_pairs/*
 *.swp
 **/__pycache__/
