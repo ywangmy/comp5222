@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # %BANNER_BEGIN%
 # ---------------------------------------------------------------------
 # %COPYRIGHT_BEGIN%
@@ -39,23 +40,22 @@
 # %AUTHORS_END%
 # --------------------------------------------------------------------*/
 # %BANNER_END%
-
 import torch
 
-from .superpoint import SuperPoint
 from .superglue import SuperGlue
-
+from .superpoint import SuperPoint
 
 
 class MatchingForTraining(torch.nn.Module):
-    """ Image Matching Frontend (SuperPoint + SuperGlue) """
+    """Image Matching Frontend (SuperPoint + SuperGlue)"""
+
     def __init__(self, config={}):
         super().__init__()
-        self.superpoint = SuperPoint(config.get('superpoint', {}))
-        self.superglue = SuperGlue(config.get('superglue', {}))
+        self.superpoint = SuperPoint(config.get("superpoint", {}))
+        self.superglue = SuperGlue(config.get("superglue", {}))
 
     def forward(self, data):
-        """ Run SuperPoint (optionally) and SuperGlue
+        """Run SuperPoint (optionally) and SuperGlue
         SuperPoint is skipped if ['keypoints0', 'keypoints1'] exist in input
         Args:
           data: dictionary with minimal keys: ['image0', 'image1', 'all_matches']
@@ -63,12 +63,12 @@ class MatchingForTraining(torch.nn.Module):
         pred = {}
 
         # Extract SuperPoint (keypoints, scores, descriptors) if not provided
-        if 'keypoints0' not in data:
-            pred0 = self.superpoint({'image': data['image0']})
-            pred = {**pred, **{k+'0': v for k, v in pred0.items()}}
-        if 'keypoints1' not in data:
-            pred1 = self.superpoint({'image': data['image1']})
-            pred = {**pred, **{k+'1': v for k, v in pred1.items()}}
+        if "keypoints0" not in data:
+            pred0 = self.superpoint({"image": data["image0"]})
+            pred = {**pred, **{k + "0": v for k, v in pred0.items()}}
+        if "keypoints1" not in data:
+            pred1 = self.superpoint({"image": data["image1"]})
+            pred = {**pred, **{k + "1": v for k, v in pred1.items()}}
 
         # Batch all features
         # We should either have i) one image per batch, or
@@ -76,20 +76,19 @@ class MatchingForTraining(torch.nn.Module):
         data = {**data, **pred}
 
         for k in data:
-            if k == 'file_name':
+            if k == "file_name":
                 continue
             if isinstance(data[k], (list, tuple)):
                 data[k] = torch.stack(data[k])
                 data[k].requres_grad = True
-                
+
         # Perform the matching
         pred = {**pred, **self.superglue(data)}
         pred = {**pred, **data}
 
         for k in pred:
-            if k == 'file_name' or k == 'skip_train':
+            if k == "file_name" or k == "skip_train":
                 continue
             pred[k].requres_grad = True
-            
-        return pred
 
+        return pred

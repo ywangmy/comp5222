@@ -1,18 +1,18 @@
+import datetime
+import math
+import os
+
+import cv2
 import numpy as np
 import torch
-import os
-import cv2
-import math
-import datetime
-
 from scipy.spatial.distance import cdist
 from torch.utils.data import Dataset
+
 
 class SparseDataset(Dataset):
     """Sparse correspondences dataset."""
 
     def __init__(self, train_path, nfeatures):
-
         self.files = []
         self.files += [train_path + f for f in os.listdir(train_path)]
 
@@ -28,12 +28,16 @@ class SparseDataset(Dataset):
         image = cv2.imread(file_name, cv2.IMREAD_GRAYSCALE)
         sift = self.sift
         width, height = image.shape[:2]
-        corners = np.array([[0, 0], [0, height], [width, 0], [width, height]], dtype=np.float32)
+        corners = np.array(
+            [[0, 0], [0, height], [width, 0], [width, height]], dtype=np.float32
+        )
         warp = np.random.randint(-224, 224, size=(4, 2)).astype(np.float32)
 
         # get the corresponding warped image
         M = cv2.getPerspectiveTransform(corners, corners + warp)
-        warped = cv2.warpPerspective(src=image, M=M, dsize=(image.shape[1], image.shape[0])) # return an image type
+        warped = cv2.warpPerspective(
+            src=image, M=M, dsize=(image.shape[1], image.shape[0])
+        )  # return an image type
 
         # extract keypoints of the image pair using SIFT
         kp1, descs1 = sift.detectAndCompute(image, None)
@@ -49,15 +53,17 @@ class SparseDataset(Dataset):
         kp2_np = np.array([(kp.pt[0], kp.pt[1]) for kp in kp2])
 
         # skip this image pair if no keypoints detected in image
-        if len(kp1) <= 1 or len(kp2) <= 1: # https://github.com/yingxin-jia/SuperGlue-pytorch/issues/31, originally < <
-            return{
-                'keypoints0': torch.zeros([0, 0, 2], dtype=torch.double),
-                'keypoints1': torch.zeros([0, 0, 2], dtype=torch.double),
-                'descriptors0': torch.zeros([0, 2], dtype=torch.double),
-                'descriptors1': torch.zeros([0, 2], dtype=torch.double),
-                'image0': image,
-                'image1': warped,
-                'file_name': file_name
+        if (
+            len(kp1) <= 1 or len(kp2) <= 1
+        ):  # https://github.com/yingxin-jia/SuperGlue-pytorch/issues/31, originally < <
+            return {
+                "keypoints0": torch.zeros([0, 0, 2], dtype=torch.double),
+                "keypoints1": torch.zeros([0, 0, 2], dtype=torch.double),
+                "descriptors0": torch.zeros([0, 2], dtype=torch.double),
+                "descriptors1": torch.zeros([0, 2], dtype=torch.double),
+                "image0": image,
+                "image1": warped,
+                "file_name": file_name,
             }
 
         # confidence of each key point
@@ -87,28 +93,37 @@ class SparseDataset(Dataset):
         missing2 = np.setdiff1d(np.arange(kp2_np.shape[0]), matches)
 
         MN = np.concatenate([min1[matches][np.newaxis, :], matches[np.newaxis, :]])
-        MN2 = np.concatenate([missing1[np.newaxis, :], (len(kp2)) * np.ones((1, len(missing1)), dtype=np.int64)])
-        MN3 = np.concatenate([(len(kp1)) * np.ones((1, len(missing2)), dtype=np.int64), missing2[np.newaxis, :]])
+        MN2 = np.concatenate(
+            [
+                missing1[np.newaxis, :],
+                (len(kp2)) * np.ones((1, len(missing1)), dtype=np.int64),
+            ]
+        )
+        MN3 = np.concatenate(
+            [
+                (len(kp1)) * np.ones((1, len(missing2)), dtype=np.int64),
+                missing2[np.newaxis, :],
+            ]
+        )
         all_matches = np.concatenate([MN, MN2, MN3], axis=1)
 
         kp1_np = kp1_np.reshape((1, -1, 2))
         kp2_np = kp2_np.reshape((1, -1, 2))
-        descs1 = np.transpose(descs1 / 256.)
-        descs2 = np.transpose(descs2 / 256.)
+        descs1 = np.transpose(descs1 / 256.0)
+        descs2 = np.transpose(descs2 / 256.0)
 
-        image = torch.from_numpy(image/255.).double()[None].cuda()
-        warped = torch.from_numpy(warped/255.).double()[None].cuda()
+        image = torch.from_numpy(image / 255.0).double()[None].cuda()
+        warped = torch.from_numpy(warped / 255.0).double()[None].cuda()
 
-        return{
-            'keypoints0': list(kp1_np),
-            'keypoints1': list(kp2_np),
-            'descriptors0': list(descs1),
-            'descriptors1': list(descs2),
-            'scores0': list(scores1_np),
-            'scores1': list(scores2_np),
-            'image0': image,
-            'image1': warped,
-            'all_matches': list(all_matches),
-            'file_name': file_name
+        return {
+            "keypoints0": list(kp1_np),
+            "keypoints1": list(kp2_np),
+            "descriptors0": list(descs1),
+            "descriptors1": list(descs2),
+            "scores0": list(scores1_np),
+            "scores1": list(scores2_np),
+            "image0": image,
+            "image1": warped,
+            "all_matches": list(all_matches),
+            "file_name": file_name,
         }
-

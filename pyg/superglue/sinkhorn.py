@@ -2,7 +2,6 @@ import torch
 
 
 def sinkhorn_pytorch(a, b, M, reg, stopThr=1e-3, numItermax=100):
-
     # init data
     dim_a = a.shape[1]
     dim_b = b.shape[1]
@@ -18,9 +17,8 @@ def sinkhorn_pytorch(a, b, M, reg, stopThr=1e-3, numItermax=100):
     err = 1
 
     while err > stopThr and cpt < numItermax:
-        KtransposeU = (K * u.unsqueeze(2)).sum(dim=1) # has shape K.shape[1]
+        KtransposeU = (K * u.unsqueeze(2)).sum(dim=1)  # has shape K.shape[1]
         v = b / KtransposeU
-        u = 1. / (Kp*v.unsqueeze(1)).sum(dim=2)
+        u = 1.0 / (Kp * v.unsqueeze(1)).sum(dim=2)
         cpt = cpt + 1
     return u.unsqueeze(2) * K * v.unsqueeze(1)
-
