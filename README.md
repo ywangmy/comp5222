@@ -1,5 +1,20 @@
 # COMP 5222 Final Project - Group 10 - GNN For Feature Matching
 
+## Usage
+
+1. Environment setup
+
+   ```Shell
+   conda env create -f environment.yml
+   conda activate gnn-feature-matching
+   ```
+
+1. Run training
+
+   ```Shell
+   ./scripts/train.py
+   ```
+
 ## Task Introduction
 
 In many tasks of computer vision, matching discrete features/objects across different frames is a difficult combinatorial optimization problem which is NP-complete, and is usually relaxed as an optimal transport problem.
