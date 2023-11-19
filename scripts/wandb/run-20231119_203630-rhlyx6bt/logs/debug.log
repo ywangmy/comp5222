@@ -1,0 +1,27 @@
+2023-11-19 20:36:30,633 INFO    MainThread:20048 [wandb_setup.py:_flush():76] Current SDK version is 0.16.0
+2023-11-19 20:36:30,634 INFO    MainThread:20048 [wandb_setup.py:_flush():76] Configure stats pid to 20048
+2023-11-19 20:36:30,634 INFO    MainThread:20048 [wandb_setup.py:_flush():76] Loading settings from /home/ywangmy/.config/wandb/settings
+2023-11-19 20:36:30,635 INFO    MainThread:20048 [wandb_setup.py:_flush():76] Loading settings from /home/ywangmy/project/mlg/scripts/wandb/settings
+2023-11-19 20:36:30,635 INFO    MainThread:20048 [wandb_setup.py:_flush():76] Loading settings from environment variables: {}
+2023-11-19 20:36:30,635 INFO    MainThread:20048 [wandb_setup.py:_flush():76] Applying setup settings: {'_disable_service': False}
+2023-11-19 20:36:30,636 INFO    MainThread:20048 [wandb_setup.py:_flush():76] Inferring run settings from compute environment: {'program_relpath': 'scripts/train.py', 'program_abspath': '/home/ywangmy/project/mlg/scripts/train.py', 'program': '/home/ywangmy/project/mlg/scripts/train.py'}
+2023-11-19 20:36:30,637 INFO    MainThread:20048 [wandb_init.py:_log_setup():524] Logging user logs to /home/ywangmy/project/mlg/scripts/wandb/run-20231119_203630-rhlyx6bt/logs/debug.log
+2023-11-19 20:36:30,637 INFO    MainThread:20048 [wandb_init.py:_log_setup():525] Logging internal logs to /home/ywangmy/project/mlg/scripts/wandb/run-20231119_203630-rhlyx6bt/logs/debug-internal.log
+2023-11-19 20:36:30,638 INFO    MainThread:20048 [wandb_init.py:init():564] calling init triggers
+2023-11-19 20:36:30,638 INFO    MainThread:20048 [wandb_init.py:init():571] wandb.init called with sweep_config: {}
+config: {'max_keypoints': 64}
+2023-11-19 20:36:30,639 INFO    MainThread:20048 [wandb_init.py:init():614] starting backend
+2023-11-19 20:36:30,639 INFO    MainThread:20048 [wandb_init.py:init():618] setting up manager
+2023-11-19 20:36:30,647 INFO    MainThread:20048 [backend.py:_multiprocessing_setup():105] multiprocessing start_methods=fork,spawn,forkserver, using: spawn
+2023-11-19 20:36:30,654 INFO    MainThread:20048 [wandb_init.py:init():624] backend started and connected
+2023-11-19 20:36:30,669 INFO    MainThread:20048 [wandb_init.py:init():716] updated telemetry
+2023-11-19 20:36:30,713 INFO    MainThread:20048 [wandb_init.py:init():749] communicating run to backend with 90.0 second timeout
+2023-11-19 20:36:31,350 INFO    MainThread:20048 [wandb_run.py:_on_init():2254] communicating current version
+2023-11-19 20:36:31,485 INFO    MainThread:20048 [wandb_run.py:_on_init():2263] got version response 
+2023-11-19 20:36:31,486 INFO    MainThread:20048 [wandb_init.py:init():800] starting run threads in backend
+2023-11-19 20:36:44,462 INFO    MainThread:20048 [wandb_run.py:_console_start():2233] atexit reg
+2023-11-19 20:36:44,462 INFO    MainThread:20048 [wandb_run.py:_redirect():2088] redirect: wrap_raw
+2023-11-19 20:36:44,463 INFO    MainThread:20048 [wandb_run.py:_redirect():2153] Wrapping output streams.
+2023-11-19 20:36:44,464 INFO    MainThread:20048 [wandb_run.py:_redirect():2178] Redirects installed.
+2023-11-19 20:36:44,466 INFO    MainThread:20048 [wandb_init.py:init():841] run started, returning control to user process
+2023-11-19 20:37:24,287 WARNING MsgRouterThr:20048 [router.py:message_loop():77] message_loop has been closed

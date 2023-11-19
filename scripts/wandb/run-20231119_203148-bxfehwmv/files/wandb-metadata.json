@@ -1,0 +1,214 @@
+{
+    "os": "Linux-3.10.0-1160.90.1.el7.x86_64-x86_64-with-glibc2.17",
+    "python": "3.10.13",
+    "heartbeatAt": "2023-11-19T12:31:49.687889",
+    "startedAt": "2023-11-19T12:31:48.667779",
+    "docker": null,
+    "cuda": null,
+    "args": [
+        "--show_keypoints"
+    ],
+    "state": "running",
+    "program": "/home/ywangmy/project/mlg/scripts/train.py",
+    "codePathLocal": "train.py",
+    "codePath": "scripts/train.py",
+    "git": {
+        "remote": "git@github.com:ywangmy/comp5222.git",
+        "commit": "00b441087d1f6f028ac6e712a812d0f3fbf515d9"
+    },
+    "email": "ywangmy@connect.ust.hk",
+    "root": "/home/ywangmy/project/mlg",
+    "host": "songcpu2",
+    "username": "ywangmy",
+    "executable": "/home/ywangmy/anaconda3/envs/sp/bin/python",
+    "cpu_count": 16,
+    "cpu_count_logical": 32,
+    "cpu_freq": {
+        "current": 1618.9991562500002,
+        "min": 1200.0,
+        "max": 3000.0
+    },
+    "cpu_freq_per_core": [
+        {
+            "current": 1348.388,
+            "min": 1200.0,
+            "max": 3000.0
+        },
+        {
+            "current": 2100.128,
+            "min": 1200.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1395.812,
+            "min": 1200.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1239.44,
+            "min": 1200.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1292.376,
+            "min": 1200.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1219.445,
+            "min": 1200.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1499.89,
+            "min": 1200.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1219.83,
+            "min": 1200.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1691.894,
+            "min": 1200.0,
+            "max": 3000.0
+        },
+        {
+            "current": 2427.227,
+            "min": 1200.0,
+            "max": 3000.0
+        },
+        {
+            "current": 2100.0,
+            "min": 1200.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1794.818,
+            "min": 1200.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1382.611,
+            "min": 1200.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1252.001,
+            "min": 1200.0,
+            "max": 3000.0
+        },
+        {
+            "current": 2100.0,
+            "min": 1200.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1991.436,
+            "min": 1200.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1253.668,
+            "min": 1200.0,
+            "max": 3000.0
+        },
+        {
+            "current": 2100.0,
+            "min": 1200.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1218.548,
+            "min": 1200.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1397.094,
+            "min": 1200.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1272.125,
+            "min": 1200.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1318.139,
+            "min": 1200.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1343.902,
+            "min": 1200.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1204.064,
+            "min": 1200.0,
+            "max": 3000.0
+        },
+        {
+            "current": 2584.753,
+            "min": 1200.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1914.788,
+            "min": 1200.0,
+            "max": 3000.0
+        },
+        {
+            "current": 2644.995,
+            "min": 1200.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1886.975,
+            "min": 1200.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1414.782,
+            "min": 1200.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1267.254,
+            "min": 1200.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1301.348,
+            "min": 1200.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1921.453,
+            "min": 1200.0,
+            "max": 3000.0
+        }
+    ],
+    "disk": {
+        "/": {
+            "total": 987.3262672424316,
+            "used": 59.74774169921875
+        }
+    },
+    "gpu": "NVIDIA RTX A6000",
+    "gpu_count": 2,
+    "gpu_devices": [
+        {
+            "name": "NVIDIA RTX A6000",
+            "memory_total": 48305799168
+        },
+        {
+            "name": "NVIDIA RTX A6000",
+            "memory_total": 48305799168
+        }
+    ],
+    "memory": {
+        "total": 377.6193962097168
+    }
+}

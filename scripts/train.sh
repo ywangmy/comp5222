@@ -1,1 +1,1 @@
-CUDA_VISIBLE_DEVICE=1 python train.py --show_keypoints
+CUDA_VISIBLE_DEVICES=1 python train.py --show_keypoints
