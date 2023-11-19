@@ -41,6 +41,8 @@
 # --------------------------------------------------------------------*/
 # %BANNER_END%
 from copy import deepcopy
+from itertools import permutations
+from itertools import product
 from pathlib import Path
 
 import torch
@@ -195,6 +197,38 @@ def generate_edges_cross(len1, len2):
     )
     edges = torch.cat([edges1, edges2], dim=1).cuda()
     return edges
+
+
+from torch_geometric.nn import GATConv
+
+
+class myAttentionalPropagation(nn.Module):
+    def __init__(self, feature_dim: int, num_heads: int):
+        super().__init__()
+        self.gatconv = GATConv(
+            in_channels=feature_dim,
+            out_channels=feature_dim,
+            heads=num_heads,
+        )  # .cuda()
+
+    def forward(self, x, edge_index):
+        # for PyG
+        from torch_geometric.data import Batch, Data
+
+        batch_list = []
+        for i in range(x.shape[0]):
+            batch_list.append(Data(x=x[i, :, :], edge_index=edge_index))
+        batch = Batch.from_data_list(batch_list)
+        # print('batch.x, .edge_index', batch.x.device, batch.x.shape, batch.edge_index.shape)
+        # print(batch, batch[0])
+        # result_list = []
+        # for i in range(x.shape[0]): # edge_index are common
+        #     print('x[i], edge_index', x[i].shape, edge_index.shape)
+        #     result_list.append(self.gatconv(x=x[i], edge_index=edge_index))
+        # return torch.stack(result_list, dim=0)
+        return torch.unsqueeze(
+            self.gatconv(x=batch.x, edge_index=batch.edge_index), dim=0
+        )
 
 
 class AttentionalGNN(nn.Module):
