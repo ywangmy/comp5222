@@ -12,9 +12,12 @@ from torch.utils.data import Dataset
 class SparseDataset(Dataset):
     """Sparse correspondences dataset."""
 
-    def __init__(self, train_path, nfeatures):
-        self.files = []
-        self.files += [train_path + f for f in os.listdir(train_path)]
+    def __init__(self, train_path, nfeatures, fraction=0.1):
+        all_files = [train_path + f for f in os.listdir(train_path)]
+
+        # Select a fraction of the total files
+        subset_size = int(len(all_files) * fraction)
+        self.files = all_files[:subset_size]
 
         self.nfeatures = nfeatures
         self.sift = cv2.xfeatures2d.SIFT_create(nfeatures=self.nfeatures)
