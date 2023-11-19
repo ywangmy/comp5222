@@ -37,6 +37,7 @@ class AttConv(MessagePassing):
         self.fc3 = torch.nn.Linear(self.in_channels, self.heads * out_channels).cuda()
 
     def forward(self, x, edge_index, size=None):
+        # x is the concatenation desc0 and desc1
 
         from torch_geometric.data import Batch, Data
         batch_list = []

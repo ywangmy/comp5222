@@ -41,7 +41,7 @@ parser.add_argument(
     '--superglue', choices={'indoor', 'outdoor'}, default='indoor',
     help='SuperGlue weights')
 parser.add_argument(
-    '--max_keypoints', type=int, default=1024,
+    '--max_keypoints', type=int, default=256,
     help='Maximum number of keypoints detected by Superpoint'
             ' (\'-1\' keeps all keypoints)')
 parser.add_argument(
@@ -105,7 +105,7 @@ parser.add_argument(
     help='Learning rate')
 
 parser.add_argument(
-    '--batch_size', type=int, default=4,
+    '--batch_size', type=int, default=1,
     help='batch_size')
 parser.add_argument(
     '--train_path', type=str, default='./COCO2014/train2014/',
@@ -160,7 +160,8 @@ if __name__ == '__main__':
     # start training
     for epoch in range(1, opt.epoch+1):
         epoch_loss = 0
-        superglue.double().train()
+        # originally double
+        superglue.float().train()
         for i, pred in enumerate(tqdm(train_loader, total=len(train_loader))):
             for k in pred:
                 if k != 'file_name' and k!='image0' and k!='image1':
@@ -169,7 +170,7 @@ if __name__ == '__main__':
                     else:
                         pred[k] = Variable(torch.stack(pred[k]).cuda())
 
-            data = superglue(pred)
+            data = superglue(pred) # originally not .float()
             for k, v in pred.items():
                 pred[k] = v[0]
             pred = {**pred, **data}
@@ -179,6 +180,8 @@ if __name__ == '__main__':
 
             # process loss
             Loss = pred['loss']
+            print('Loss', Loss)
+            exit()
             epoch_loss += Loss.item()
             mean_loss.append(Loss)
 
