@@ -167,3 +167,76 @@
 2023-11-19 20:39:12,788 INFO    SenderThread:21135 [sender.py:_save_file():1380] saving file wandb-summary.json with policy end
 2023-11-19 20:39:13,190 INFO    Thread-12 :21135 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/ywangmy/project/mlg/scripts/wandb/run-20231119_203803-y7xrqcyh/files/wandb-summary.json
 2023-11-19 20:39:13,191 INFO    Thread-12 :21135 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/ywangmy/project/mlg/scripts/wandb/run-20231119_203803-y7xrqcyh/files/output.log
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        handler.py:handle_request():146] handle_request: partial_history
+2023-11-19 20:39:25,692 DEBUG   SenderThread:21135 [sender.py:send():380] send: history
+2023-11-19 20:39:25,693 DEBUG   SenderThread:21135 [sender.py:send_request():407] send_request: summary_record
+2023-11-19 20:39:25,710 INFO    SenderThread:21135 [sender.py:_save_file():1380] saving file wandb-summary.json with policy end
+2023-11-19 20:39:26,245 INFO    Thread-12 :21135 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/ywangmy/project/mlg/scripts/wandb/run-20231119_203803-y7xrqcyh/files/wandb-summary.json
+2023-11-19 20:39:27,248 INFO    Thread-12 :21135 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/ywangmy/project/mlg/scripts/wandb/run-20231119_203803-y7xrqcyh/files/output.log
+2023-11-19 20:39:28,938 DEBUG   HandlerThread:21135 [handler.py:handle_request():146] handle_request: partial_history
+2023-11-19 20:39:28,940 DEBUG   SenderThread:21135 [sender.py:send():380] send: history
+2023-11-19 20:39:28,941 DEBUG   SenderThread:21135 [sender.py:send_request():407] send_request: summary_record
+2023-11-19 20:39:28,946 INFO    SenderThread:21135 [sender.py:_save_file():1380] saving file wandb-summary.json with policy end
+2023-11-19 20:39:29,258 INFO    Thread-12 :21135 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/ywangmy/project/mlg/scripts/wandb/run-20231119_203803-y7xrqcyh/files/wandb-summary.json
+2023-11-19 20:39:29,259 INFO    Thread-12 :21135 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/ywangmy/project/mlg/scripts/wandb/run-20231119_203803-y7xrqcyh/files/output.log
+2023-11-19 20:39:30,127 DEBUG   HandlerThread:21135 [handler.py:handle_request():146] handle_request: status_report
+2023-11-19 20:39:31,264 INFO    Thread-12 :21135 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/ywangmy/project/mlg/scripts/wandb/run-20231119_203803-y7xrqcyh/files/output.log
+2023-11-19 20:39:31,581 DEBUG   HandlerThread:21135 [handler.py:handle_request():146] handle_request: stop_status
+2023-11-19 20:39:31,582 DEBUG   HandlerThread:21135 [handler.py:handle_request():146] handle_request: internal_messages
+2023-11-19 20:39:31,582 DEBUG   SenderThread:21135 [sender.py:send_request():407] send_request: stop_status
+2023-11-19 20:39:32,117 DEBUG   HandlerThread:21135 [handler.py:handle_request():146] handle_request: partial_history
+2023-11-19 20:39:32,119 DEBUG   SenderThread:21135 [sender.py:send():380] send: history
+2023-11-19 20:39:32,119 DEBUG   SenderThread:21135 [sender.py:send_request():407] send_request: summary_record
+2023-11-19 20:39:32,124 INFO    SenderThread:21135 [sender.py:_save_file():1380] saving file wandb-summary.json with policy end
+2023-11-19 20:39:32,269 INFO    Thread-12 :21135 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/ywangmy/project/mlg/scripts/wandb/run-20231119_203803-y7xrqcyh/files/wandb-summary.json
+2023-11-19 20:39:33,273 INFO    Thread-12 :21135 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/ywangmy/project/mlg/scripts/wandb/run-20231119_203803-y7xrqcyh/files/output.log
+2023-11-19 20:39:34,182 DEBUG   SenderThread:21135 [sender.py:send():380] send: stats
+2023-11-19 20:39:35,168 DEBUG   HandlerThread:21135 [handler.py:handle_request():146] handle_request: partial_history
+2023-11-19 20:39:35,169 DEBUG   HandlerThread:21135 [handler.py:handle_request():146] handle_request: status_report
+2023-11-19 20:39:35,170 DEBUG   SenderThread:21135 [sender.py:send():380] send: history
+2023-11-19 20:39:35,171 DEBUG   SenderThread:21135 [sender.py:send_request():407] send_request: summary_record
+2023-11-19 20:39:35,175 INFO    SenderThread:21135 [sender.py:_save_file():1380] saving file wandb-summary.json with policy end
+2023-11-19 20:39:35,283 INFO    Thread-12 :21135 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/ywangmy/project/mlg/scripts/wandb/run-20231119_203803-y7xrqcyh/files/wandb-summary.json
+2023-11-19 20:39:37,290 INFO    Thread-12 :21135 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/ywangmy/project/mlg/scripts/wandb/run-20231119_203803-y7xrqcyh/files/output.log
+2023-11-19 20:39:38,735 DEBUG   HandlerThread:21135 [handler.py:handle_request():146] handle_request: partial_history
+2023-11-19 20:39:38,736 DEBUG   SenderThread:21135 [sender.py:send():380] send: history
+2023-11-19 20:39:38,737 DEBUG   SenderThread:21135 [sender.py:send_request():407] send_request: summary_record
+2023-11-19 20:39:38,747 INFO    SenderThread:21135 [sender.py:_save_file():1380] saving file wandb-summary.json with policy end
+2023-11-19 20:39:39,296 INFO    Thread-12 :21135 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/ywangmy/project/mlg/scripts/wandb/run-20231119_203803-y7xrqcyh/files/wandb-summary.json
+2023-11-19 20:39:39,297 INFO    Thread-12 :21135 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/ywangmy/project/mlg/scripts/wandb/run-20231119_203803-y7xrqcyh/files/output.log
+2023-11-19 20:39:40,959 DEBUG   HandlerThread:21135 [handler.py:handle_request():146] handle_request: status_report
+2023-11-19 20:39:42,313 DEBUG   HandlerThread:21135 [handler.py:handle_request():146] handle_request: partial_history
+2023-11-19 20:39:42,315 DEBUG   SenderThread:21135 [sender.py:send():380] send: history
+2023-11-19 20:39:42,316 DEBUG   SenderThread:21135 [sender.py:send_request():407] send_request: summary_record
+2023-11-19 20:39:42,320 INFO    SenderThread:21135 [sender.py:_save_file():1380] saving file wandb-summary.json with policy end
+2023-11-19 20:39:43,315 INFO    Thread-12 :21135 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/ywangmy/project/mlg/scripts/wandb/run-20231119_203803-y7xrqcyh/files/wandb-summary.json
+2023-11-19 20:39:43,316 INFO    Thread-12 :21135 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/ywangmy/project/mlg/scripts/wandb/run-20231119_203803-y7xrqcyh/files/output.log
+2023-11-19 20:39:45,572 DEBUG   HandlerThread:21135 [handler.py:handle_request():146] handle_request: partial_history
+2023-11-19 20:39:45,573 DEBUG   SenderThread:21135 [sender.py:send():380] send: history
+2023-11-19 20:39:45,574 DEBUG   SenderThread:21135 [sender.py:send_request():407] send_request: summary_record
+2023-11-19 20:39:45,578 INFO    SenderThread:21135 [sender.py:_save_file():1380] saving file wandb-summary.json with policy end
+2023-11-19 20:39:46,327 INFO    Thread-12 :21135 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/ywangmy/project/mlg/scripts/wandb/run-20231119_203803-y7xrqcyh/files/wandb-summary.json
+2023-11-19 20:39:46,582 DEBUG   HandlerThread:21135 [handler.py:handle_request():146] handle_request: stop_status
+2023-11-19 20:39:46,583 DEBUG   HandlerThread:21135 [handler.py:handle_request():146] handle_request: internal_messages
+2023-11-19 20:39:46,584 DEBUG   SenderThread:21135 [sender.py:send_request():407] send_request: stop_status
+2023-11-19 20:39:46,817 DEBUG   HandlerThread:21135 [handler.py:handle_request():146] handle_request: status_report
+2023-11-19 20:39:47,330 INFO    Thread-12 :21135 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/ywangmy/project/mlg/scripts/wandb/run-20231119_203803-y7xrqcyh/files/output.log
+2023-11-19 20:39:49,197 DEBUG   HandlerThread:21135 [handler.py:handle_request():146] handle_request: partial_history
+2023-11-19 20:39:49,199 DEBUG   SenderThread:21135 [sender.py:send():380] send: history
+2023-11-19 20:39:49,199 DEBUG   SenderThread:21135 [sender.py:send_request():407] send_request: summary_record
+2023-11-19 20:39:49,206 INFO    SenderThread:21135 [sender.py:_save_file():1380] saving file wandb-summary.json with policy end
+2023-11-19 20:39:49,339 INFO    Thread-12 :21135 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/ywangmy/project/mlg/scripts/wandb/run-20231119_203803-y7xrqcyh/files/wandb-summary.json
+2023-11-19 20:39:51,346 INFO    Thread-12 :21135 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/ywangmy/project/mlg/scripts/wandb/run-20231119_203803-y7xrqcyh/files/output.log
+2023-11-19 20:39:52,320 DEBUG   HandlerThread:21135 [handler.py:handle_request():146] handle_request: status_report
+2023-11-19 20:39:52,445 DEBUG   HandlerThread:21135 [handler.py:handle_request():146] handle_request: partial_history
+2023-11-19 20:39:52,447 DEBUG   SenderThread:21135 [sender.py:send():380] send: history
+2023-11-19 20:39:52,448 DEBUG   SenderThread:21135 [sender.py:send_request():407] send_request: summary_record
+2023-11-19 20:39:52,453 INFO    SenderThread:21135 [sender.py:_save_file():1380] saving file wandb-summary.json with policy end
+2023-11-19 20:39:53,352 INFO    Thread-12 :21135 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/ywangmy/project/mlg/scripts/wandb/run-20231119_203803-y7xrqcyh/files/wandb-summary.json
+2023-11-19 20:39:53,353 INFO    Thread-12 :21135 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/ywangmy/project/mlg/scripts/wandb/run-20231119_203803-y7xrqcyh/files/output.log
+2023-11-19 20:39:55,558 DEBUG   HandlerThread:21135 [handler.py:handle_request():146] handle_request: partial_history
+2023-11-19 20:39:55,559 DEBUG   SenderThread:21135 [sender.py:send():380] send: history
+2023-11-19 20:39:55,560 DEBUG   SenderThread:21135 [sender.py:send_request():407] send_request: summary_record
+2023-11-19 20:39:55,581 INFO    SenderThread:21135 [sender.py:_save_file():1380] saving file wandb-summary.json with policy end
+2023-11-19 20:39:56,360 INFO    Thread-12 :21135 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/ywangmy/project/mlg/scripts/wandb/run-20231119_203803-y7xrqcyh/files/wandb-summary.json
+2023-11-19 20:39:57,363 INFO    Thread-12 :21135 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/ywangmy/project/mlg/scripts/wandb/run-20231119_203803-y7xrqcyh/files/output.log

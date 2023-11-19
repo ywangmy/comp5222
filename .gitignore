@@ -2,3 +2,4 @@ scripts/COCO2014
 scripts/dump_match_pairs/*
 *.swp
 **/__pycache__/
+scripts/wandb
