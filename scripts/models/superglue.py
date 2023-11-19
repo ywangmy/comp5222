@@ -81,7 +81,7 @@ class KeypointEncoder(nn.Module):
         nn.init.constant_(self.encoder[-1].bias, 0.0)
 
     def forward(self, kpts, scores):
-        inputs = [kpts.transpose(1, 2), scores.unsqueeze(1)]
+        inputs = [kpts.transpose(1, 2).float(), scores.unsqueeze(1).float()]
         return self.encoder(torch.cat(inputs, dim=1))
 
 
@@ -122,27 +122,146 @@ class AttentionalPropagation(nn.Module):
         nn.init.constant_(self.mlp[-1].bias, 0.0)
 
     def forward(self, x, source):
+        # full connection between x and source
         message = self.attn(x, source, source)
         return self.mlp(torch.cat([x, message], dim=1))
 
 
-class AttentionalGNN(nn.Module):
-    def __init__(self, feature_dim: int, layer_names: list):
+from torch_geometric.nn import GATConv
+
+
+class myAttentionalPropagation(nn.Module):
+    def __init__(self, feature_dim: int, num_heads: int):
         super().__init__()
-        self.layers = nn.ModuleList(
-            [AttentionalPropagation(feature_dim, 4) for _ in range(len(layer_names))]
+        self.gatconv = GATConv(
+            in_channels=feature_dim,
+            out_channels=feature_dim,
+            heads=num_heads,
+        )  # .cuda()
+
+    def forward(self, x, edge_index):
+        # for PyG
+        from torch_geometric.data import Batch, Data
+
+        batch_list = []
+        for i in range(x.shape[0]):
+            batch_list.append(Data(x=x[i, :, :], edge_index=edge_index))
+        batch = Batch.from_data_list(batch_list)
+        # print('batch.x, .edge_index', batch.x.device, batch.x.shape, batch.edge_index.shape)
+        # print(batch, batch[0])
+        # result_list = []
+        # for i in range(x.shape[0]): # edge_index are common
+        #     print('x[i], edge_index', x[i].shape, edge_index.shape)
+        #     result_list.append(self.gatconv(x=x[i], edge_index=edge_index))
+        # return torch.stack(result_list, dim=0)
+        return torch.unsqueeze(
+            self.gatconv(x=batch.x, edge_index=batch.edge_index), dim=0
         )
+
+
+from itertools import product, permutations
+
+
+def generate_edges_intra(len1, len2):
+    edges1 = (
+        torch.tensor(
+            list(permutations(range(len1), 2)), dtype=torch.long, requires_grad=False
+        )
+        .t()
+        .contiguous()
+    )
+    edges2 = (
+        torch.tensor(
+            list(permutations(range(len2), 2)), dtype=torch.long, requires_grad=False
+        )
+        .t()
+        .contiguous()
+        + len1
+    )
+    edges = torch.cat([edges1, edges2], dim=1).cuda()
+    return edges
+
+
+def generate_edges_cross(len1, len2):
+    edges1 = (
+        torch.tensor(list(product(range(len1), range(len1, len1 + len2))))
+        .t()
+        .contiguous()
+    )
+    edges2 = (
+        torch.tensor(list(product(range(len1, len1 + len2), range(len1))))
+        .t()
+        .contiguous()
+    )
+    edges = torch.cat([edges1, edges2], dim=1).cuda()
+    return edges
+
+
+class AttentionalGNN(nn.Module):
+    def __init__(self, feature_dim: int, layer_names: list, num_heads):
+        super().__init__()
+        # self.layers = nn.ModuleList([
+        #     AttentionalPropagation(feature_dim, 4)
+        #     for _ in range(len(layer_names))])
+        self.feature_dim = feature_dim
+        self.layers = [
+            (
+                myAttentionalPropagation(
+                    feature_dim=feature_dim, num_heads=num_heads
+                ).cuda(),
+                MLP(
+                    [
+                        feature_dim * (num_heads + 1),
+                        feature_dim * (num_heads + 1),
+                        feature_dim,
+                    ]
+                ).cuda(),
+            )
+            for _ in range(len(layer_names))
+        ]
         self.names = layer_names
 
     def forward(self, desc0, desc1):
-        for layer, name in zip(self.layers, self.names):
-            layer.attn.prob = []
+        # for layer, name in zip(self.layers, self.names):
+        #     layer.attn.prob = []
+        #     if name == 'cross':
+        #         src0, src1 = desc1, desc0
+        #     else:  # if name == 'self':
+        #         src0, src1 = desc0, desc1
+        #     delta0, delta1 = layer(desc0, src0), layer(desc1, src1)
+        #     # skip conn
+        #     desc0, desc1 = (desc0 + delta0), (desc1 + delta1)
+        # (B, D, N), (B, D, N)
+        # print(desc0.shape, desc1.shape, desc0.device, desc1.device)
+        x = torch.cat([desc0, desc1], dim=2).cuda()
+        # print(x.shape, x.device)
+        size0, size1 = desc0.shape[2], desc1.shape[2]
+        edges_intra = generate_edges_intra(size0, size1)
+        edges_cross = generate_edges_cross(size0, size1)
+        for (mp, mlp), name in zip(self.layers, self.names):
+            x = torch.permute(x, (0, 2, 1)).float()  # -> (B, N, D)
+            # print('x', x.shape, x.device)
+            # print(name)
+            # 1. aggregation: in feature_dim, out feature_dim * num_heads
             if name == "cross":
-                src0, src1 = desc1, desc0
-            else:  # if name == 'self':
-                src0, src1 = desc0, desc1
-            delta0, delta1 = layer(desc0, src0), layer(desc1, src1)
-            desc0, desc1 = (desc0 + delta0), (desc1 + delta1)
+                edges = generate_edges_cross(size0, size1)
+            elif name == "self":
+                edges = generate_edges_intra(size0, size1)
+            msg = mp(x, edges)
+            # print('msg', msg.shape, msg.device)
+            # 2. cat with x: in feature_dim, out feature_dim*(num_heads + 1)
+            # 3. pass through a MLP: in feature_dim * 2, out feature_dim (internal dim see init)
+            # 4. skip connection: in feature_dim, out feature_dim
+            xmsg = torch.cat([x, msg], dim=2)  # -> (B, N, D*(num_heads+1))
+            xmsg = torch.permute(xmsg, (0, 2, 1))  # -> (B, D*(num_heads+1), N)
+            # print('xmsg', xmsg.shape)
+            x = torch.permute(x, (0, 2, 1))  # -> (B, D, N)
+            # print('x', x.shape, x.device)
+            x += mlp(xmsg)  # -> (B, D, N)
+            # print('x', x.shape, x.device)
+        desc0 = x[:, :, :size0]
+        desc1 = x[:, :, size0:]
+        # print(desc0.shape, desc1.shape, desc0.device, desc1.device)
         return desc0, desc1
 
 
@@ -220,7 +339,7 @@ class SuperGlue(nn.Module):
         )
 
         self.gnn = AttentionalGNN(
-            self.config["descriptor_dim"], self.config["GNN_layers"]
+            self.config["descriptor_dim"], self.config["GNN_layers"], num_heads=4
         )
 
         self.final_proj = nn.Conv1d(
@@ -242,8 +361,10 @@ class SuperGlue(nn.Module):
 
     def forward(self, data):
         """Run SuperGlue on a pair of keypoints and descriptors"""
-        desc0, desc1 = data["descriptors0"].double(), data["descriptors1"].double()
-        kpts0, kpts1 = data["keypoints0"].double(), data["keypoints1"].double()
+        # originally double
+        # print('Entering superglue')
+        desc0, desc1 = data["descriptors0"].float(), data["descriptors1"].float()
+        kpts0, kpts1 = data["keypoints0"].float(), data["keypoints1"].float()
 
         desc0 = desc0.transpose(0, 1)
         desc1 = desc1.transpose(0, 1)
@@ -275,6 +396,7 @@ class SuperGlue(nn.Module):
 
         # Multi-layer Transformer network.
         desc0, desc1 = self.gnn(desc0, desc1)
+        # print('gnn out desc0 desc1', desc0.shape, desc0.shape)
 
         # Final MLP projection.
         mdesc0, mdesc1 = self.final_proj(desc0), self.final_proj(desc1)
@@ -302,17 +424,23 @@ class SuperGlue(nn.Module):
         indices1 = torch.where(valid1, indices1, indices1.new_tensor(-1))
 
         # check if indexed correctly
+        # print('all_matches', all_matches.shape)
         loss = []
         for i in range(len(all_matches[0])):
             x = all_matches[0][i][0]
             y = all_matches[0][i][1]
-            loss.append(-torch.log(scores[0][x][y].exp()))  # check batch size == 1 ?
+            expscores = scores[0][x][y]
+            loss.append(-torch.log(expscores.exp()))
+            # loss.append(-torch.log( scores[0][x][y].exp() )) # check batch size == 1 ?
         # for p0 in unmatched0:
         #     loss += -torch.log(scores[0][p0][-1])
         # for p1 in unmatched1:
         #     loss += -torch.log(scores[0][-1][p1])
-        loss_mean = torch.mean(torch.stack(loss))
-        loss_mean = torch.reshape(loss_mean, (1, -1))
+        # print('loss', loss)
+        loss_mean_unreshaped = torch.mean(torch.stack(loss))
+        # print('loss_mean_unreshaped', loss_mean_unreshaped)
+        loss_mean = torch.reshape(loss_mean_unreshaped, (1, -1))
+        # print('loss_mean', loss_mean)
         return {
             "matches0": indices0[0],  # use -1 for invalid match
             "matches1": indices1[0],  # use -1 for invalid match

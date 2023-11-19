@@ -7,6 +7,8 @@ import torch
 import torch_geometric
 from superglue.sinkhorn import sinkhorn_pytorch
 from torch.nn.parameter import Parameter
+from torch_geometric.data import Batch
+from torch_geometric.data import Data
 from torch_geometric.nn import MessagePassing
 from torch_geometric.nn.inits import glorot
 from torch_geometric.nn.inits import zeros
@@ -67,7 +69,7 @@ class AttConv(MessagePassing):
         self.fc3 = torch.nn.Linear(self.in_channels, self.heads * out_channels).cuda()
 
     def forward(self, x, edge_index, size=None):
-        from torch_geometric.data import Batch, Data
+        # x is the concatenation desc0 and desc1
 
         batch_list = []
         for i in range(x.shape[0]):

@@ -57,10 +57,10 @@ class SparseDataset(Dataset):
             len(kp1) <= 1 or len(kp2) <= 1
         ):  # https://github.com/yingxin-jia/SuperGlue-pytorch/issues/31, originally < <
             return {
-                "keypoints0": torch.zeros([0, 0, 2], dtype=torch.double),
-                "keypoints1": torch.zeros([0, 0, 2], dtype=torch.double),
-                "descriptors0": torch.zeros([0, 2], dtype=torch.double),
-                "descriptors1": torch.zeros([0, 2], dtype=torch.double),
+                "keypoints0": torch.zeros([0, 0, 2], dtype=torch.float),
+                "keypoints1": torch.zeros([0, 0, 2], dtype=torch.float),
+                "descriptors0": torch.zeros([0, 2], dtype=torch.float),
+                "descriptors1": torch.zeros([0, 2], dtype=torch.float),
                 "image0": image,
                 "image1": warped,
                 "file_name": file_name,
@@ -112,8 +112,8 @@ class SparseDataset(Dataset):
         descs1 = np.transpose(descs1 / 256.0)
         descs2 = np.transpose(descs2 / 256.0)
 
-        image = torch.from_numpy(image / 255.0).double()[None].cuda()
-        warped = torch.from_numpy(warped / 255.0).double()[None].cuda()
+        image = torch.from_numpy(image / 255.0).float()[None].cuda()
+        warped = torch.from_numpy(warped / 255.0).float()[None].cuda()
 
         return {
             "keypoints0": list(kp1_np),

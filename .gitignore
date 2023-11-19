@@ -18,6 +18,7 @@ ipython_config.py
 ### Python ###
 # Byte-compiled / optimized / DLL files
 __pycache__/
+**/__pycache__/
 *.py[cod]
 *$py.class
 
@@ -207,6 +208,6 @@ pyrightconfig.json
 # End of https://www.toptal.com/developers/gitignore/api/visualstudiocode,python,jupyternotebooks
 
 scripts/COCO2014
-scripts/dump_match_pairs/*
+scripts/dump_match_pairs
+scripts/wandb
 *.swp
-**/__pycache__/

@@ -8,6 +8,7 @@ import matplotlib.cm as cm
 import numpy as np
 import torch.multiprocessing
 import torch.nn as nn
+import wandb
 from load_data import SparseDataset
 from models.matchingForTraining import MatchingForTraining
 from models.superglue import SuperGlue
@@ -53,7 +54,7 @@ parser.add_argument(
 parser.add_argument(
     "--max_keypoints",
     type=int,
-    default=1024,
+    default=64,
     help="Maximum number of keypoints detected by Superpoint"
     " ('-1' keeps all keypoints)",
 )
@@ -150,7 +151,7 @@ parser.add_argument(
 )
 parser.add_argument("--learning_rate", type=int, default=0.0001, help="Learning rate")
 
-parser.add_argument("--batch_size", type=int, default=4, help="batch_size")
+parser.add_argument("--batch_size", type=int, default=1, help="batch_size")
 parser.add_argument(
     "--train_path",
     type=str,
@@ -195,6 +196,8 @@ if __name__ == "__main__":
         },
     }
 
+    torch.autograd.set_detect_anomaly(True)
+
     # load training data
     train_set = SparseDataset(opt.train_path, opt.max_keypoints)
     train_loader = torch.utils.data.DataLoader(
@@ -210,11 +213,21 @@ if __name__ == "__main__":
     optimizer = torch.optim.Adam(superglue.parameters(), lr=opt.learning_rate)
     mean_loss = []
 
+    wandb.init(
+        # set the wandb project where this run will be logged
+        project="comp5222",
+        # track hyperparameters and run metadata
+        config={
+            "max_keypoints": opt.max_keypoints,
+        },
+    )
+
     # start training
     for epoch in range(1, opt.epoch + 1):
         epoch_loss = 0
-        superglue.double().train()
-        for i, pred in enumerate(tqdm(train_loader, total=len(train_loader))):
+        # originally double
+        superglue.float().train()
+        for i, pred in enumerate(pbar := tqdm(train_loader, total=len(train_loader))):
             for k in pred:
                 if k != "file_name" and k != "image0" and k != "image1":
                     if type(pred[k]) == torch.Tensor:
@@ -222,7 +235,7 @@ if __name__ == "__main__":
                     else:
                         pred[k] = Variable(torch.stack(pred[k]).cuda())
 
-            data = superglue(pred)
+            data = superglue(pred)  # originally not .float()
             for k, v in pred.items():
                 pred[k] = v[0]
             pred = {**pred, **data}
@@ -234,6 +247,8 @@ if __name__ == "__main__":
             Loss = pred["loss"]
             epoch_loss += Loss.item()
             mean_loss.append(Loss)
+            pbar.set_description(f"running ave. loss {epoch_loss / (i+1)}")
+            wandb.log({"loss": Loss.item()})
 
             superglue.zero_grad()
             Loss.backward()
