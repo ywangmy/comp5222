@@ -47,14 +47,11 @@ class SparseDataset(Dataset):
         kp2, descs2 = sift.detectAndCompute(warped, None)
 
         # limit the number of keypoints
-        # kp1_num = min(self.nfeatures, len(kp1))
-        # kp2_num = min(self.nfeatures, len(kp2))
-        kp1_num = kp2_num = self.nfeatures
+        kp1_num = min(self.nfeatures, len(kp1))
+        kp2_num = min(self.nfeatures, len(kp2))
+        # kp1_num = kp2_num = self.nfeatures
         kp1 = kp1[:kp1_num]
         kp2 = kp2[:kp2_num]
-        if len(kp1) != 64:
-            print(len(kp1))
-            exit()
 
         kp1_np = np.array([(kp.pt[0], kp.pt[1]) for kp in kp1])
         kp2_np = np.array([(kp.pt[0], kp.pt[1]) for kp in kp2])
@@ -114,8 +111,8 @@ class SparseDataset(Dataset):
         )
         all_matches = np.concatenate([MN, MN2, MN3], axis=1)
 
-        kp1_np = kp1_np.reshape((1, -1, 2))
-        kp2_np = kp2_np.reshape((1, -1, 2))
+        # kp1_np = kp1_np.reshape((1, -1, 2))
+        # kp2_np = kp2_np.reshape((1, -1, 2))
         descs1 = np.transpose(descs1 / 256.0)
         descs2 = np.transpose(descs2 / 256.0)
 
@@ -123,14 +120,74 @@ class SparseDataset(Dataset):
         warped = torch.from_numpy(warped / 255.0).float()[None].cuda()
 
         return {
-            "keypoints0": list(kp1_np),
-            "keypoints1": list(kp2_np),
-            "descriptors0": list(descs1),
-            "descriptors1": list(descs2),
-            "scores0": list(scores1_np),
-            "scores1": list(scores2_np),
+            "keypoints0": torch.from_numpy(kp1_np),
+            "keypoints1": torch.from_numpy(kp2_np),
+            "descriptors0": torch.from_numpy(descs1),
+            "descriptors1": torch.from_numpy(descs2),
+            "scores0": torch.from_numpy(scores1_np),
+            "scores1": torch.from_numpy(scores2_np),
             "image0": image,
             "image1": warped,
-            "all_matches": list(all_matches),
+            "all_matches": torch.from_numpy(all_matches),
             "file_name": file_name,
+        }
+
+    def collate_fn(self, batch):
+        # batch format:
+        #       0:
+        #           'keypoints0': [a numpy array with shape (nkeypoints, 2)]
+        #           'keypoints1': [a numpy array with shape (nkeypoints, 2)]
+        #           'descriptors0': [a numpy array with shape (64)], length = nkeypoints
+        #           'descriptors1': [a numpy array with shape (64)], length = nkeypoints
+        #           'scores0': [a 1 element numpy array with shape ()] length = nkeypoints
+        #           'scores1': [a 1 element numpy array with shape ()] length = nkeypoints
+        #           'image0': [a numpy array with shape (1, height, width)]
+        import pdb
+
+        pdb.set_trace()
+
+        # Initialize lists to hold the batch data
+        keypoints0, keypoints1 = [], []
+        descriptors0, descriptors1 = [], []
+        scores0, scores1 = [], []
+        images0, images1 = [], []
+        all_matches = []
+        file_names = []
+
+        # Go through each sample and append the data to the lists
+        for item in batch:
+            keypoints0.append(torch.FloatTensor(item["keypoints0"]))
+            keypoints1.append(torch.FloatTensor(item["keypoints1"]))
+            descriptors0.append(torch.FloatTensor(item["descriptors0"]))
+            descriptors1.append(torch.FloatTensor(item["descriptors1"]))
+            scores0.append(torch.FloatTensor(item["scores0"]))
+            scores1.append(torch.FloatTensor(item["scores1"]))
+            images0.append(item["image0"])
+            images1.append(item["image1"])
+            all_matches.append(torch.LongTensor(item["all_matches"]))
+            file_names.append(item["file_name"])
+
+        # Convert lists to tensors or stack them appropriately
+        keypoints0 = torch.cat(keypoints0, dim=0)
+        keypoints1 = torch.cat(keypoints1, dim=0)
+        descriptors0 = torch.cat(descriptors0, dim=0)
+        descriptors1 = torch.cat(descriptors1, dim=0)
+        scores0 = torch.cat(scores0, dim=0)
+        scores1 = torch.cat(scores1, dim=0)
+        images0 = torch.stack(images0, dim=0)
+        images1 = torch.stack(images1, dim=0)
+        all_matches = torch.cat(all_matches, dim=0)
+
+        # Return a dictionary with the batched data
+        return {
+            "keypoints0": keypoints0,
+            "keypoints1": keypoints1,
+            "descriptors0": descriptors0,
+            "descriptors1": descriptors1,
+            "scores0": scores0,
+            "scores1": scores1,
+            "image0": images0,
+            "image1": images1,
+            "all_matches": all_matches,
+            "file_names": file_names,
         }

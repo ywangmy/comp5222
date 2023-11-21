@@ -457,10 +457,10 @@ class SuperGlue(nn.Module):
         desc0, desc1 = data["descriptors0"].float(), data["descriptors1"].float()
         kpts0, kpts1 = data["keypoints0"].float(), data["keypoints1"].float()
 
-        desc0 = desc0.transpose(0, 1)
-        desc1 = desc1.transpose(0, 1)
-        kpts0 = torch.reshape(kpts0, (1, -1, 2))
-        kpts1 = torch.reshape(kpts1, (1, -1, 2))
+        # desc0 = desc0.transpose(0, 1)
+        # desc1 = desc1.transpose(0, 1)
+        # kpts0 = torch.reshape(kpts0, (1, -1, 2))
+        # kpts1 = torch.reshape(kpts1, (1, -1, 2))
 
         if kpts0.shape[1] == 0 or kpts1.shape[1] == 0:  # no keypoints
             shape0, shape1 = kpts0.shape[:-1], kpts1.shape[:-1]
@@ -473,17 +473,18 @@ class SuperGlue(nn.Module):
             }
 
         file_name = data["file_name"]
-        all_matches = data["all_matches"].permute(
-            1, 2, 0
-        )  # shape=torch.Size([1, 87, 2])
+        all_matches = data["all_matches"]
+        # all_matches = data["all_matches"].permute(
+        #     1, 2, 0
+        # )  # shape=torch.Size([1, 87, 2])
 
         # Keypoint normalization.
         kpts0 = normalize_keypoints(kpts0, data["image0"].shape)
         kpts1 = normalize_keypoints(kpts1, data["image1"].shape)
 
         # Keypoint MLP encoder.
-        desc0 = desc0 + self.kenc(kpts0, torch.transpose(data["scores0"], 0, 1))
-        desc1 = desc1 + self.kenc(kpts1, torch.transpose(data["scores1"], 0, 1))
+        desc0 = desc0 + self.kenc(kpts0, data["scores0"])
+        desc1 = desc1 + self.kenc(kpts1, data["scores1"])
 
         # Multi-layer Transformer network.
         desc0, desc1 = self.gnn(desc0, desc1)
@@ -519,8 +520,6 @@ class SuperGlue(nn.Module):
         indices1 = torch.where(valid1, indices1, indices1.new_tensor(-1))
 
         # check if indexed correctly
-
-        # print('all_matches', all_matches.shape)
 
         loss = []
         for i in range(len(all_matches[0])):

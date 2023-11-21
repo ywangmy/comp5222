@@ -224,7 +224,11 @@ if __name__ == "__main__":
     # load training data
     train_set = SparseDataset(opt.train_path, opt.max_keypoints, opt.fraction)
     train_loader = torch.utils.data.DataLoader(
-        dataset=train_set, shuffle=False, batch_size=opt.batch_size, drop_last=True
+        dataset=train_set,
+        shuffle=False,
+        batch_size=opt.batch_size,
+        drop_last=True,
+        # collate_fn=train_set.collate_fn,
     )
 
     superglue = SuperGlue(config.get("superglue", {}))
@@ -306,9 +310,11 @@ if __name__ == "__main__":
                     pred["image0"].cpu().numpy()[0] * 255.0,
                     pred["image1"].cpu().numpy()[0] * 255.0,
                 )
+
+                # import pdb; pdb.set_trace()
                 kpts0, kpts1 = (
-                    pred["keypoints0"].cpu().numpy()[0],
-                    pred["keypoints1"].cpu().numpy()[0],
+                    pred["keypoints0"].cpu().numpy(),
+                    pred["keypoints1"].cpu().numpy(),
                 )
                 matches, conf = (
                     pred["matches0"].cpu().detach().numpy(),
