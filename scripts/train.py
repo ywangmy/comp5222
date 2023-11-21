@@ -150,30 +150,24 @@ parser.add_argument(
     help="Path to the directory in which the .npz results and optional,"
     "visualizations are written",
 )
+
 parser.add_argument("--learning_rate", type=int, default=0.0001, help="Learning rate")
 
 parser.add_argument("--batch_size", type=int, default=1, help="batch_size")
 parser.add_argument(
-    '--learning_rate', type=int, default=0.0001,
-    help='Learning rate')
-
-parser.add_argument(
-    '--batch_size', type=int, default=1,
-    help='batch_size')
-parser.add_argument(
-    '--train_path', type=str, default='./COCO2014/train2014/',
-    help='Path to the directory of training imgs.')
-parser.add_argument(
-    '--epoch', type=int, default=100,
-    help='Number of epoches')
-
-parser.add_argument(
-    '--descriptor_dim', type=int, default=128
+    "--train_path",
+    type=str,
+    default="./COCO2014/train2014/",
+    help="Path to the directory of training imgs.",
 )
+parser.add_argument("--epoch", type=int, default=100, help="Number of epoches")
 
-parser.add_argument(
-    '--fraction', type=float, default=1.0
-)
+parser.add_argument("--descriptor_dim", type=int, default=128)
+
+parser.add_argument("--fraction", type=float, default=1.0)
+
+parser.add_argument("--model", default="gat")
+parser.add_argument("--gnn_layers", type=int, default=3)
 
 
 if __name__ == "__main__":
@@ -193,33 +187,36 @@ if __name__ == "__main__":
     ), "Cannot use pdf extension with --fast_viz"
 
     # store viz results
-    eval_output_dir = Path(opt.eval_output_dir)
+    eval_output_dir = (
+        Path(opt.eval_output_dir) / f"{opt.model}-{opt.fraction}-{opt.match_threshold}"
+    )
     eval_output_dir.mkdir(exist_ok=True, parents=True)
     print(
         "Will write visualization images to", 'directory "{}"'.format(eval_output_dir)
     )
     config = {
-        'superpoint': {
-            'nms_radius': opt.nms_radius,
-            'keypoint_threshold': opt.keypoint_threshold,
-            'max_keypoints': opt.max_keypoints,
-            'descriptor_dim': 256,
-            'nms_radius': 4,
-            'keypoint_threshold': 0.005,
-            'max_keypoints': -1,
-            'remove_borders': 4,
+        "superpoint": {
+            "nms_radius": opt.nms_radius,
+            "keypoint_threshold": opt.keypoint_threshold,
+            "max_keypoints": opt.max_keypoints,
+            "descriptor_dim": 256,
+            "nms_radius": 4,
+            "keypoint_threshold": 0.005,
+            "max_keypoints": -1,
+            "remove_borders": 4,
         },
-        'superglue': {
-            'weights': opt.superglue,
-            'sinkhorn_iterations': opt.sinkhorn_iterations,
-            'match_threshold': opt.match_threshold,
-            'descriptor_dim': 128,
-            'weights': 'indoor',
-            'keypoint_encoder': [32, 64, 128],
-            'GNN_layers': ['self', 'cross'] * 3,
-            'sinkhorn_iterations': 100,
-            'match_threshold': 0.2,
-        }
+        "superglue": {
+            "model": opt.model,
+            "weights": opt.superglue,
+            "sinkhorn_iterations": opt.sinkhorn_iterations,
+            "match_threshold": opt.match_threshold,
+            "descriptor_dim": 128,
+            "weights": "indoor",
+            "keypoint_encoder": [32, 64, 128],
+            "GNN_layers": ["self", "cross"] * opt.gnn_layers,
+            "sinkhorn_iterations": 100,
+            "match_threshold": 0.2,
+        },
     }
 
     torch.autograd.set_detect_anomaly(True)
@@ -227,7 +224,8 @@ if __name__ == "__main__":
     # load training data
     train_set = SparseDataset(opt.train_path, opt.max_keypoints, opt.fraction)
     train_loader = torch.utils.data.DataLoader(
-         dataset=train_set, shuffle=False, batch_size=opt.batch_size, drop_last=True)
+        dataset=train_set, shuffle=False, batch_size=opt.batch_size, drop_last=True
+    )
 
     superglue = SuperGlue(config.get("superglue", {}))
 
@@ -245,9 +243,10 @@ if __name__ == "__main__":
         config={
             "max_keypoints": opt.max_keypoints,
             "resize": opt.resize,
-            'learning_rate': opt.learning_rate,
-            'data_fraction': opt.data_fraction
-        }.update(config['superglue'])
+            "learning_rate": opt.learning_rate,
+            "fraction": opt.fraction,
+        }
+        | config["superglue"],
     )
 
     # start training
@@ -272,7 +271,7 @@ if __name__ == "__main__":
                 continue
 
             # process loss
-            Loss = pred['loss']
+            Loss = pred["loss"]
 
             # print('Loss', Loss)
             # exit()
@@ -288,7 +287,7 @@ if __name__ == "__main__":
             optimizer.step()
 
             # for every 50 images, print progress and visualize the matches
-            if (i + 1) % 50 == 0:
+            if (i + 1) % 5 == 0:
                 print(
                     "Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}".format(
                         epoch,
@@ -358,7 +357,8 @@ if __name__ == "__main__":
 
         # save checkpoint when an epoch finishes
         epoch_loss /= len(train_loader)
-        model_out_path = "model_epoch_{}.pth".format(epoch)
+        model_out_path = f"ckpt/{opt.model}/model_epoch_{epoch}.pth"
+        Path(f"ckpt/{opt.model}").mkdir(parents=True, exist_ok=True)
         torch.save(superglue, model_out_path)
         print(
             "Epoch [{}/{}] done. Epoch Loss {}. Checkpoint saved to {}".format(

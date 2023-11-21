@@ -47,10 +47,14 @@ class SparseDataset(Dataset):
         kp2, descs2 = sift.detectAndCompute(warped, None)
 
         # limit the number of keypoints
-        kp1_num = min(self.nfeatures, len(kp1))
-        kp2_num = min(self.nfeatures, len(kp2))
+        # kp1_num = min(self.nfeatures, len(kp1))
+        # kp2_num = min(self.nfeatures, len(kp2))
+        kp1_num = kp2_num = self.nfeatures
         kp1 = kp1[:kp1_num]
         kp2 = kp2[:kp2_num]
+        if len(kp1) != 64:
+            print(len(kp1))
+            exit()
 
         kp1_np = np.array([(kp.pt[0], kp.pt[1]) for kp in kp1])
         kp2_np = np.array([(kp.pt[0], kp.pt[1]) for kp in kp2])

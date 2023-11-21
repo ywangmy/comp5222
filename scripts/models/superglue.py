@@ -83,8 +83,10 @@ class KeypointEncoder(nn.Module):
         nn.init.constant_(self.encoder[-1].bias, 0.0)
 
     def forward(self, kpts, scores):
-        inputs = [kpts.transpose(1, 2).float(), scores.unsqueeze(1).float()]
-        return self.encoder(torch.cat(inputs, dim=1))
+        inputs = torch.cat(
+            [kpts.transpose(1, 2).float(), scores.unsqueeze(1).float()], dim=1
+        )
+        return self.encoder(inputs)
 
 
 def attention(query, key, value):
@@ -121,12 +123,18 @@ class AttentionalPropagation(nn.Module):
         super().__init__()
         self.attn = MultiHeadedAttention(num_heads, feature_dim)
         self.mlp = MLP([feature_dim * 2, feature_dim * 2, feature_dim])
+        # from torch_geometric.nn import MLP as pygMLP
+        # self.mlp = pygMLP([feature_dim * 2, feature_dim, feature_dim], plain_last=False)
+        # self.mlp = nn.Sequential([nn.linear()])
         nn.init.constant_(self.mlp[-1].bias, 0.0)
 
     def forward(self, x, source):
         # full connection between x and source
         message = self.attn(x, source, source)
+
         return self.mlp(torch.cat([x, message], dim=1))
+        # print(torch.permute(torch.cat([x, message], dim=1), (0,2,1)).shape)
+        # return torch.permute(self.mlp(torch.permute(torch.cat([x, message], dim=1), (0,2,1))), (0,2,1))
 
 
 from torch_geometric.nn import GATConv
@@ -162,11 +170,10 @@ class myAttentionalPropagation(nn.Module):
         )
 
 
-
 from itertools import product, permutations
 
 
-def generate_edges_intra(len1, len2):
+def generate_edges_intra(len1, len2, with_attr: bool = False):
     edges1 = (
         torch.tensor(
             list(permutations(range(len1), 2)), dtype=torch.long, requires_grad=False
@@ -183,10 +190,11 @@ def generate_edges_intra(len1, len2):
         + len1
     )
     edges = torch.cat([edges1, edges2], dim=1).cuda()
+    # edges_attr = torch.repeat(torch.tensor([0, 1]))
     return edges
 
 
-def generate_edges_cross(len1, len2):
+def generate_edges_cross(len1, len2, with_attr: bool = False):
     edges1 = (
         torch.tensor(list(product(range(len1), range(len1, len1 + len2))))
         .t()
@@ -211,6 +219,7 @@ class myAttentionalPropagation(nn.Module):
             in_channels=feature_dim,
             out_channels=feature_dim,
             heads=num_heads,
+            concat=False,
         )  # .cuda()
 
     def forward(self, x, edge_index):
@@ -236,37 +245,65 @@ class myAttentionalPropagation(nn.Module):
 class AttentionalGNN(nn.Module):
     def __init__(self, feature_dim: int, layer_names: list, num_heads):
         super().__init__()
-        # self.layers = nn.ModuleList([
-        #     AttentionalPropagation(feature_dim, 4)
-        #     for _ in range(len(layer_names))])
+
         self.feature_dim = feature_dim
-        self.layers = [
-            (
-                myAttentionalPropagation(
-                    feature_dim=feature_dim, num_heads=num_heads
-                ).cuda(),
-                MLP(
-                    [
-                        feature_dim * (num_heads + 1),
-                        feature_dim * (num_heads + 1),
-                        feature_dim,
-                    ]
-                ).cuda(),
-            )
-            for _ in range(len(layer_names))
-        ]
+        self.layers = nn.ModuleList(
+            [AttentionalPropagation(feature_dim, 4) for _ in range(len(layer_names))]
+        )
         self.names = layer_names
 
     def forward(self, desc0, desc1):
-        # for layer, name in zip(self.layers, self.names):
-        #     layer.attn.prob = []
-        #     if name == 'cross':
-        #         src0, src1 = desc1, desc0
-        #     else:  # if name == 'self':
-        #         src0, src1 = desc0, desc1
-        #     delta0, delta1 = layer(desc0, src0), layer(desc1, src1)
-        #     # skip conn
-        #     desc0, desc1 = (desc0 + delta0), (desc1 + delta1)
+        for layer, name in zip(self.layers, self.names):
+            layer.attn.prob = []
+            if name == "cross":
+                src0, src1 = desc1, desc0
+            else:  # if name == 'self':
+                src0, src1 = desc0, desc1
+            delta0, delta1 = layer(desc0, src0), layer(desc1, src1)
+            # skip conn
+            desc0, desc1 = (desc0 + delta0), (desc1 + delta1)
+        return desc0, desc1
+
+
+class myAttentionalGNN(nn.Module):
+    def __init__(self, model: str, feature_dim: int, layer_names: list, num_heads):
+        super().__init__()
+        from torch_geometric.nn import MLP as pygMLP
+        from torch_geometric.nn.norm import InstanceNorm, BatchNorm
+
+        self.feature_dim = feature_dim
+        if model == "ori":
+            self.layers = nn.ModuleList(
+                [
+                    AttentionalPropagation(feature_dim, 4)
+                    for _ in range(len(layer_names))
+                ]
+            )
+        elif model == "gat":
+            self.layers = [
+                (
+                    myAttentionalPropagation(
+                        feature_dim=feature_dim, num_heads=num_heads
+                    ).cuda(),
+                    # MLP(
+                    #     [
+                    #         feature_dim * (1 + 1),
+                    #         feature_dim * (1 + 1),
+                    #         feature_dim,
+                    #     ]
+                    # ).cuda(),
+                    nn.Sequential(
+                        nn.Linear(feature_dim * (1 + 1), feature_dim).cuda(),
+                        # InstanceNorm(feature_dim).cuda(),
+                        nn.ReLU().cuda(),
+                    )
+                    # pygMLP([feature_dim * 2, feature_dim], plain_last=False).cuda()
+                )
+                for _ in range(len(layer_names))
+            ]
+        self.names = layer_names
+
+    def forward(self, desc0, desc1):
         # (B, D, N), (B, D, N)
 
         # print(desc0.shape, desc1.shape, desc0.device, desc1.device)
@@ -275,9 +312,10 @@ class AttentionalGNN(nn.Module):
         size0, size1 = desc0.shape[2], desc1.shape[2]
         # edges_intra = generate_edges_intra(size0, size1)
         # edges_cross = generate_edges_cross(size0, size1)
+        x = torch.permute(x, (0, 2, 1)).float()  # -> (B, N, D)
         for (mp, mlp), name in zip(self.layers, self.names):
-            x = torch.permute(x, (0, 2, 1)).float()  # -> (B, N, D)
             # print('x', x.shape, x.device)
+
             # print(name)
             # 1. aggregation: in feature_dim, out feature_dim * num_heads
             if name == "cross":
@@ -290,17 +328,17 @@ class AttentionalGNN(nn.Module):
             # 3. pass through a MLP: in feature_dim * 2, out feature_dim (internal dim see init)
             # 4. skip connection: in feature_dim, out feature_dim
             xmsg = torch.cat([x, msg], dim=2)  # -> (B, N, D*(num_heads+1))
-            xmsg = torch.permute(xmsg, (0, 2, 1))  # -> (B, D*(num_heads+1), N)
+            # xmsg = torch.permute(xmsg, (0, 2, 1))  # -> (B, D*(num_heads+1), N)
             # print('xmsg', xmsg.shape)
-            x = torch.permute(x, (0, 2, 1))  # -> (B, D, N)
+            # x = torch.permute(x, (0, 2, 1))  # -> (B, D, N)
             # print('x', x.shape, x.device)
             x += mlp(xmsg)  # -> (B, D, N)
             # print('x', x.shape, x.device)
+        x = torch.permute(x, (0, 2, 1)).float()  # -> (B, D, N)
         desc0 = x[:, :, :size0]
         desc1 = x[:, :, size0:]
         # print(desc0.shape, desc1.shape, desc0.device, desc1.device)
         return desc0, desc1
-
 
 
 def log_sinkhorn_iterations(Z, log_mu, log_nu, iters: int):
@@ -371,15 +409,23 @@ class SuperGlue(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.config = {**self.default_config, **config}
-        print('SuperGlue Config:', self.config)
+        print("SuperGlue Config:", self.config)
 
         self.kenc = KeypointEncoder(
             self.config["descriptor_dim"], self.config["keypoint_encoder"]
         )
 
-        self.gnn = AttentionalGNN(
-            self.config["descriptor_dim"], self.config["GNN_layers"], num_heads=4
-        )
+        if config["model"] == "ori":
+            self.gnn = AttentionalGNN(
+                self.config["descriptor_dim"], self.config["GNN_layers"], num_heads=4
+            )
+        else:
+            self.gnn = myAttentionalGNN(
+                self.config["model"],
+                self.config["descriptor_dim"],
+                self.config["GNN_layers"],
+                num_heads=4,
+            )
 
         self.final_proj = nn.Conv1d(
             self.config["descriptor_dim"],
@@ -387,6 +433,11 @@ class SuperGlue(nn.Module):
             kernel_size=1,
             bias=True,
         )
+        # self.final_proj = nn.Linear(
+        #     self.config["descriptor_dim"],
+        #     self.config["descriptor_dim"],
+        #     bias=True,
+        # )
 
         bin_score = torch.nn.Parameter(torch.tensor(1.0))
         self.register_parameter("bin_score", bin_score)
@@ -438,9 +489,12 @@ class SuperGlue(nn.Module):
         desc0, desc1 = self.gnn(desc0, desc1)
         # print('gnn out desc0 desc1', desc0.shape, desc0.shape)
 
-
         # Final MLP projection.
+        # desc0 = torch.permute(desc0, (0, 2, 1)).float()
+        # desc1 = torch.permute(desc1, (0, 2, 1)).float()
         mdesc0, mdesc1 = self.final_proj(desc0), self.final_proj(desc1)
+        # mdesc0 = torch.permute(mdesc0, (0, 2, 1)).float()
+        # mdesc1 = torch.permute(mdesc1, (0, 2, 1)).float()
 
         # Compute matching descriptor distance.
         scores = torch.einsum("bdn,bdm->bnm", mdesc0, mdesc1)

@@ -214,3 +214,4 @@ scripts/dump_match_pairs*
 **/__pycache__/
 scripts/wandb/*
 scripts/*.pth
+scripts/ckpt*
