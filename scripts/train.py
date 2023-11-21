@@ -41,7 +41,11 @@ parser.add_argument(
     '--superglue', choices={'indoor', 'outdoor'}, default='indoor',
     help='SuperGlue weights')
 parser.add_argument(
+<<<<<<< HEAD
     '--max_keypoints', type=int, default=64,
+=======
+    '--max_keypoints', type=int, default=256,
+>>>>>>> master
     help='Maximum number of keypoints detected by Superpoint'
             ' (\'-1\' keeps all keypoints)')
 parser.add_argument(
@@ -196,7 +200,11 @@ if __name__ == '__main__':
         epoch_loss = 0
         # originally double
         superglue.float().train()
+<<<<<<< HEAD
         for i, pred in enumerate(pbar := tqdm(train_loader, total=len(train_loader))):
+=======
+        for i, pred in enumerate(tqdm(train_loader, total=len(train_loader))):
+>>>>>>> master
             for k in pred:
                 if k != 'file_name' and k!='image0' and k!='image1':
                     if type(pred[k]) == torch.Tensor:
@@ -214,9 +222,15 @@ if __name__ == '__main__':
 
             # process loss
             Loss = pred['loss']
+<<<<<<< HEAD
             # print('Loss', Loss)
             # exit()
             epoch_loss +=gi Loss.item()
+=======
+            print('Loss', Loss)
+            exit()
+            epoch_loss += Loss.item()
+>>>>>>> master
             mean_loss.append(Loss)
             pbar.set_description(f'running ave. loss {epoch_loss / (i+1)}')
             wandb.log({"loss": Loss.item()})

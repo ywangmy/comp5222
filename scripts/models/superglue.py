@@ -133,6 +133,7 @@ class myAttentionalPropagation(nn.Module):
             )#.cuda()
     def forward(self, x, edge_index):
         # for PyG
+<<<<<<< HEAD
         from torch_geometric.data import Batch, Data
         batch_list = []
         for i in range(x.shape[0]):
@@ -146,6 +147,20 @@ class myAttentionalPropagation(nn.Module):
         #     result_list.append(self.gatconv(x=x[i], edge_index=edge_index))
         # return torch.stack(result_list, dim=0)
         return torch.unsqueeze(self.gatconv(x=batch.x, edge_index=batch.edge_index), dim=0)
+=======
+        # from torch_geometric.data import Batch, Data
+        # batch_list = []
+        # for i in range(x.shape[0]):
+        #     batch_list.append(Data(x=x[i, :, :], edge_index=edge_index))
+        # batch = Batch.from_data_list(batch_list)
+        # print(batch.x.device, batch.x.shape, batch.edge_index.shape)
+        # print(batch, batch[0])
+        result_list = []
+        for x_ in x: # edge_index are common
+            print('x_, edge_index', x_.shape, edge_index.shape)
+            result_list.append(self.gatconv(x=x_, edge_index=edge_index))
+        return torch.stack(result_list, dim=0)
+>>>>>>> master
 
 from itertools import product, permutations
 def generate_edges_intra(len1, len2):
@@ -188,6 +203,7 @@ class AttentionalGNN(nn.Module):
         #     # skip conn
         #     desc0, desc1 = (desc0 + delta0), (desc1 + delta1)
         # (B, D, N), (B, D, N)
+<<<<<<< HEAD
         # print(desc0.shape, desc1.shape, desc0.device, desc1.device)
         x = torch.cat([desc0, desc1], dim=2).cuda()
         # print(x.shape, x.device)
@@ -219,6 +235,33 @@ class AttentionalGNN(nn.Module):
         desc1 = x[:, :, size0:]
         # print(desc0.shape, desc1.shape, desc0.device, desc1.device)
         return desc0, desc1
+=======
+        print(desc0.shape, desc1.shape, desc0.device, desc1.device)
+        x = torch.cat([desc0, desc1], dim=2).cuda()
+        print(x.shape, x.device)
+        size0, size1 = desc0.shape[2], desc1.shape[2]
+        edges_intra = generate_edges_intra(size0, size1)
+        edges_cross = generate_edges_cross(size0, size1)
+        for (mp, mlp), name in zip(self.layers, self.names):
+            x = torch.permute(x, (0, 2, 1)).float() # -> (B, N, D)
+            print('x', x.shape, x.device)
+            print(name)
+            # 1. aggregation: in feature_dim, out feature_dim * num_heads
+            if name == 'cross':
+                msg = mp(x, edges_cross)#.cuda()
+            elif name == 'self':
+                msg = mp(x, edges_intra)#.cuda()
+            print('msg', msg.shape, msg.device)
+            # 2. cat with x: in feature_dim, out feature_dim*(num_heads + 1)
+            # 3. pass through a MLP: in feature_dim * 2, out feature_dim (internal dim see init)
+            # 4. skip connection: in feature_dim, out feature_dim
+            x = torch.permute(x, (0, 2, 1)) # -> (B, D, N)
+            print('x', x.shape, x.device)
+            x += mlp(torch.cat([x, msg], dim=1)) # -> (B, D*(num_heads+1), N) -> (B, D, N)
+            print('x', x.shape, x.device)
+        return torch.split(tensor=x, split_size_or_sections=size0, dim=2)
+        # return desc0, desc1
+>>>>>>> master
 
 
 def log_sinkhorn_iterations(Z, log_mu, log_nu, iters: int):
@@ -312,7 +355,11 @@ class SuperGlue(nn.Module):
     def forward(self, data):
         """Run SuperGlue on a pair of keypoints and descriptors"""
         # originally double
+<<<<<<< HEAD
         # print('Entering superglue')
+=======
+        print('Entering superglue')
+>>>>>>> master
         desc0, desc1 = data['descriptors0'].float(), data['descriptors1'].float()
         kpts0, kpts1 = data['keypoints0'].float(), data['keypoints1'].float()
 
@@ -344,7 +391,11 @@ class SuperGlue(nn.Module):
 
         # Multi-layer Transformer network.
         desc0, desc1 = self.gnn(desc0, desc1)
+<<<<<<< HEAD
         # print('gnn out desc0 desc1', desc0.shape, desc0.shape)
+=======
+        print('gnn out desc0 desc1', desc0.shape, desc0.shape)
+>>>>>>> master
 
         # Final MLP projection.
         mdesc0, mdesc1 = self.final_proj(desc0), self.final_proj(desc1)
@@ -373,7 +424,11 @@ class SuperGlue(nn.Module):
 
 
         # check if indexed correctly
+<<<<<<< HEAD
         # print('all_matches', all_matches.shape)
+=======
+        print('all_matches', all_matches.shape)
+>>>>>>> master
         loss = []
         for i in range(len(all_matches[0])):
             x = all_matches[0][i][0]
@@ -387,15 +442,21 @@ class SuperGlue(nn.Module):
         #     loss += -torch.log(scores[0][-1][p1])
         # print('loss', loss)
         loss_mean_unreshaped = torch.mean(torch.stack(loss))
+<<<<<<< HEAD
         # print('loss_mean_unreshaped', loss_mean_unreshaped)
         loss_mean = torch.reshape(loss_mean_unreshaped, (1, -1))
         # print('loss_mean', loss_mean)
+=======
+        print('loss_mean_unreshaped', loss_mean_unreshaped)
+        loss_mean = torch.reshape(loss_mean_unreshaped, (1, -1))
+        print('loss_mean', loss_mean)
+>>>>>>> master
         return {
             'matches0': indices0[0], # use -1 for invalid match
             'matches1': indices1[0], # use -1 for invalid match
             'matching_scores0': mscores0[0],
             'matching_scores1': mscores1[0],
-            'loss': loss_mean[0],
+            'loss': scores[0][0][0], #loss_mean[0],
             'skip_train': False
         }
 
