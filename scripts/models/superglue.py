@@ -162,7 +162,6 @@ class myAttentionalPropagation(nn.Module):
         )
 
 
-
 from itertools import product, permutations
 
 
@@ -302,7 +301,6 @@ class AttentionalGNN(nn.Module):
         return desc0, desc1
 
 
-
 def log_sinkhorn_iterations(Z, log_mu, log_nu, iters: int):
     """Perform Sinkhorn Normalization in Log-space for stability"""
     u, v = torch.zeros_like(log_mu), torch.zeros_like(log_nu)
@@ -371,7 +369,7 @@ class SuperGlue(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.config = {**self.default_config, **config}
-        print('SuperGlue Config:', self.config)
+        print("SuperGlue Config:", self.config)
 
         self.kenc = KeypointEncoder(
             self.config["descriptor_dim"], self.config["keypoint_encoder"]
@@ -437,7 +435,6 @@ class SuperGlue(nn.Module):
         # Multi-layer Transformer network.
         desc0, desc1 = self.gnn(desc0, desc1)
         # print('gnn out desc0 desc1', desc0.shape, desc0.shape)
-
 
         # Final MLP projection.
         mdesc0, mdesc1 = self.final_proj(desc0), self.final_proj(desc1)

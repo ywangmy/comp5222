@@ -153,27 +153,20 @@ parser.add_argument(
 parser.add_argument("--learning_rate", type=int, default=0.0001, help="Learning rate")
 
 parser.add_argument("--batch_size", type=int, default=1, help="batch_size")
-parser.add_argument(
-    '--learning_rate', type=int, default=0.0001,
-    help='Learning rate')
+parser.add_argument("--learning_rate", type=int, default=0.0001, help="Learning rate")
 
+parser.add_argument("--batch_size", type=int, default=1, help="batch_size")
 parser.add_argument(
-    '--batch_size', type=int, default=1,
-    help='batch_size')
-parser.add_argument(
-    '--train_path', type=str, default='./COCO2014/train2014/',
-    help='Path to the directory of training imgs.')
-parser.add_argument(
-    '--epoch', type=int, default=100,
-    help='Number of epoches')
-
-parser.add_argument(
-    '--descriptor_dim', type=int, default=128
+    "--train_path",
+    type=str,
+    default="./COCO2014/train2014/",
+    help="Path to the directory of training imgs.",
 )
+parser.add_argument("--epoch", type=int, default=100, help="Number of epoches")
 
-parser.add_argument(
-    '--fraction', type=float, default=1.0
-)
+parser.add_argument("--descriptor_dim", type=int, default=128)
+
+parser.add_argument("--fraction", type=float, default=1.0)
 
 
 if __name__ == "__main__":
@@ -199,27 +192,27 @@ if __name__ == "__main__":
         "Will write visualization images to", 'directory "{}"'.format(eval_output_dir)
     )
     config = {
-        'superpoint': {
-            'nms_radius': opt.nms_radius,
-            'keypoint_threshold': opt.keypoint_threshold,
-            'max_keypoints': opt.max_keypoints,
-            'descriptor_dim': 256,
-            'nms_radius': 4,
-            'keypoint_threshold': 0.005,
-            'max_keypoints': -1,
-            'remove_borders': 4,
+        "superpoint": {
+            "nms_radius": opt.nms_radius,
+            "keypoint_threshold": opt.keypoint_threshold,
+            "max_keypoints": opt.max_keypoints,
+            "descriptor_dim": 256,
+            "nms_radius": 4,
+            "keypoint_threshold": 0.005,
+            "max_keypoints": -1,
+            "remove_borders": 4,
         },
-        'superglue': {
-            'weights': opt.superglue,
-            'sinkhorn_iterations': opt.sinkhorn_iterations,
-            'match_threshold': opt.match_threshold,
-            'descriptor_dim': 128,
-            'weights': 'indoor',
-            'keypoint_encoder': [32, 64, 128],
-            'GNN_layers': ['self', 'cross'] * 3,
-            'sinkhorn_iterations': 100,
-            'match_threshold': 0.2,
-        }
+        "superglue": {
+            "weights": opt.superglue,
+            "sinkhorn_iterations": opt.sinkhorn_iterations,
+            "match_threshold": opt.match_threshold,
+            "descriptor_dim": 128,
+            "weights": "indoor",
+            "keypoint_encoder": [32, 64, 128],
+            "GNN_layers": ["self", "cross"] * 3,
+            "sinkhorn_iterations": 100,
+            "match_threshold": 0.2,
+        },
     }
 
     torch.autograd.set_detect_anomaly(True)
@@ -227,7 +220,8 @@ if __name__ == "__main__":
     # load training data
     train_set = SparseDataset(opt.train_path, opt.max_keypoints, opt.fraction)
     train_loader = torch.utils.data.DataLoader(
-         dataset=train_set, shuffle=False, batch_size=opt.batch_size, drop_last=True)
+        dataset=train_set, shuffle=False, batch_size=opt.batch_size, drop_last=True
+    )
 
     superglue = SuperGlue(config.get("superglue", {}))
 
@@ -245,9 +239,9 @@ if __name__ == "__main__":
         config={
             "max_keypoints": opt.max_keypoints,
             "resize": opt.resize,
-            'learning_rate': opt.learning_rate,
-            'data_fraction': opt.data_fraction
-        }.update(config['superglue'])
+            "learning_rate": opt.learning_rate,
+            "data_fraction": opt.data_fraction,
+        }.update(config["superglue"]),
     )
 
     # start training
@@ -272,7 +266,7 @@ if __name__ == "__main__":
                 continue
 
             # process loss
-            Loss = pred['loss']
+            Loss = pred["loss"]
 
             # print('Loss', Loss)
             # exit()
