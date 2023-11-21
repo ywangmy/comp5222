@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # %BANNER_BEGIN%
 # ---------------------------------------------------------------------
 # %COPYRIGHT_BEGIN%
@@ -39,23 +40,23 @@
 # %AUTHORS_END%
 # --------------------------------------------------------------------*/
 # %BANNER_END%
-
 from copy import deepcopy
+from itertools import permutations
+from itertools import product
 from pathlib import Path
+
 import torch
 from torch import nn
-
 from torch_geometric.nn import MessagePassing
 
 
 def MLP(channels: list, do_bn=True):
-    """ Multi-layer perceptron """
+    """Multi-layer perceptron"""
     n = len(channels)
     layers = []
     for i in range(1, n):
-        layers.append(
-            nn.Conv1d(channels[i - 1], channels[i], kernel_size=1, bias=True))
-        if i < (n-1):
+        layers.append(nn.Conv1d(channels[i - 1], channels[i], kernel_size=1, bias=True))
+        if i < (n - 1):
             if do_bn:
                 # layers.append(nn.BatchNorm1d(channels[i]))
                 layers.append(nn.InstanceNorm1d(channels[i]))
@@ -64,17 +65,18 @@ def MLP(channels: list, do_bn=True):
 
 
 def normalize_keypoints(kpts, image_shape):
-    """ Normalize keypoints locations based on image image_shape"""
+    """Normalize keypoints locations based on image image_shape"""
     _, _, height, width = image_shape
     one = kpts.new_tensor(1)
-    size = torch.stack([one*width, one*height])[None]
+    size = torch.stack([one * width, one * height])[None]
     center = size / 2
     scaling = size.max(1, keepdim=True).values * 0.7
     return (kpts - center[:, None, :]) / scaling[:, None, :]
 
 
 class KeypointEncoder(nn.Module):
-    """ Joint encoding of visual appearance and location using MLPs"""
+    """Joint encoding of visual appearance and location using MLPs"""
+
     def __init__(self, feature_dim, layers):
         super().__init__()
         self.encoder = MLP([3] + layers + [feature_dim])
@@ -87,13 +89,14 @@ class KeypointEncoder(nn.Module):
 
 def attention(query, key, value):
     dim = query.shape[1]
-    scores = torch.einsum('bdhn,bdhm->bhnm', query, key) / dim**.5
+    scores = torch.einsum("bdhn,bdhm->bhnm", query, key) / dim**0.5
     prob = torch.nn.functional.softmax(scores, dim=-1)
-    return torch.einsum('bhnm,bdhm->bdhn', prob, value), prob
+    return torch.einsum("bhnm,bdhm->bdhn", prob, value), prob
 
 
 class MultiHeadedAttention(nn.Module):
-    """ Multi-head attention to increase model expressivitiy """
+    """Multi-head attention to increase model expressivitiy"""
+
     def __init__(self, num_heads: int, d_model: int):
         super().__init__()
         assert d_model % num_heads == 0
@@ -104,18 +107,20 @@ class MultiHeadedAttention(nn.Module):
 
     def forward(self, query, key, value):
         batch_dim = query.size(0)
-        query, key, value = [l(x).view(batch_dim, self.dim, self.num_heads, -1)
-                             for l, x in zip(self.proj, (query, key, value))]
+        query, key, value = [
+            l(x).view(batch_dim, self.dim, self.num_heads, -1)
+            for l, x in zip(self.proj, (query, key, value))
+        ]
         x, prob = attention(query, key, value)
         self.prob.append(prob)
-        return self.merge(x.contiguous().view(batch_dim, self.dim*self.num_heads, -1))
+        return self.merge(x.contiguous().view(batch_dim, self.dim * self.num_heads, -1))
 
 
 class AttentionalPropagation(nn.Module):
     def __init__(self, feature_dim: int, num_heads: int):
         super().__init__()
         self.attn = MultiHeadedAttention(num_heads, feature_dim)
-        self.mlp = MLP([feature_dim*2, feature_dim*2, feature_dim])
+        self.mlp = MLP([feature_dim * 2, feature_dim * 2, feature_dim])
         nn.init.constant_(self.mlp[-1].bias, 0.0)
 
     def forward(self, x, source):
@@ -123,18 +128,24 @@ class AttentionalPropagation(nn.Module):
         message = self.attn(x, source, source)
         return self.mlp(torch.cat([x, message], dim=1))
 
+
 from torch_geometric.nn import GATConv
+
+
 class myAttentionalPropagation(nn.Module):
     def __init__(self, feature_dim: int, num_heads: int):
         super().__init__()
         self.gatconv = GATConv(
-            in_channels=feature_dim, out_channels=feature_dim,
+            in_channels=feature_dim,
+            out_channels=feature_dim,
             heads=num_heads,
-            )#.cuda()
+        )  # .cuda()
+
     def forward(self, x, edge_index):
         # for PyG
 
         from torch_geometric.data import Batch, Data
+
         batch_list = []
         for i in range(x.shape[0]):
             batch_list.append(Data(x=x[i, :, :], edge_index=edge_index))
@@ -146,22 +157,81 @@ class myAttentionalPropagation(nn.Module):
         #     print('x[i], edge_index', x[i].shape, edge_index.shape)
         #     result_list.append(self.gatconv(x=x[i], edge_index=edge_index))
         # return torch.stack(result_list, dim=0)
-        return torch.unsqueeze(self.gatconv(x=batch.x, edge_index=batch.edge_index), dim=0)
+        return torch.unsqueeze(
+            self.gatconv(x=batch.x, edge_index=batch.edge_index), dim=0
+        )
+
 
 
 from itertools import product, permutations
+
+
 def generate_edges_intra(len1, len2):
-    edges1 = torch.tensor(list(permutations(range(len1), 2)), dtype=torch.long, requires_grad=False).t().contiguous()
-    edges2 = torch.tensor(list(permutations(range(len2), 2)), dtype=torch.long, requires_grad=False).t().contiguous() + len1
+    edges1 = (
+        torch.tensor(
+            list(permutations(range(len1), 2)), dtype=torch.long, requires_grad=False
+        )
+        .t()
+        .contiguous()
+    )
+    edges2 = (
+        torch.tensor(
+            list(permutations(range(len2), 2)), dtype=torch.long, requires_grad=False
+        )
+        .t()
+        .contiguous()
+        + len1
+    )
     edges = torch.cat([edges1, edges2], dim=1).cuda()
     return edges
 
 
 def generate_edges_cross(len1, len2):
-    edges1 = torch.tensor(list(product(range(len1), range(len1, len1+len2)))).t().contiguous()
-    edges2 = torch.tensor(list(product(range(len1, len1+len2), range(len1)))).t().contiguous()
+    edges1 = (
+        torch.tensor(list(product(range(len1), range(len1, len1 + len2))))
+        .t()
+        .contiguous()
+    )
+    edges2 = (
+        torch.tensor(list(product(range(len1, len1 + len2), range(len1))))
+        .t()
+        .contiguous()
+    )
     edges = torch.cat([edges1, edges2], dim=1).cuda()
     return edges
+
+
+from torch_geometric.nn import GATConv
+
+
+class myAttentionalPropagation(nn.Module):
+    def __init__(self, feature_dim: int, num_heads: int):
+        super().__init__()
+        self.gatconv = GATConv(
+            in_channels=feature_dim,
+            out_channels=feature_dim,
+            heads=num_heads,
+        )  # .cuda()
+
+    def forward(self, x, edge_index):
+        # for PyG
+        from torch_geometric.data import Batch, Data
+
+        batch_list = []
+        for i in range(x.shape[0]):
+            batch_list.append(Data(x=x[i, :, :], edge_index=edge_index))
+        batch = Batch.from_data_list(batch_list)
+        # print('batch.x, .edge_index', batch.x.device, batch.x.shape, batch.edge_index.shape)
+        # print(batch, batch[0])
+        # result_list = []
+        # for i in range(x.shape[0]): # edge_index are common
+        #     print('x[i], edge_index', x[i].shape, edge_index.shape)
+        #     result_list.append(self.gatconv(x=x[i], edge_index=edge_index))
+        # return torch.stack(result_list, dim=0)
+        return torch.unsqueeze(
+            self.gatconv(x=batch.x, edge_index=batch.edge_index), dim=0
+        )
+
 
 class AttentionalGNN(nn.Module):
     def __init__(self, feature_dim: int, layer_names: list, num_heads):
@@ -172,8 +242,16 @@ class AttentionalGNN(nn.Module):
         self.feature_dim = feature_dim
         self.layers = [
             (
-                myAttentionalPropagation(feature_dim=feature_dim, num_heads=num_heads).cuda(),
-                MLP([feature_dim*(num_heads+1), feature_dim*(num_heads+1), feature_dim]).cuda()
+                myAttentionalPropagation(
+                    feature_dim=feature_dim, num_heads=num_heads
+                ).cuda(),
+                MLP(
+                    [
+                        feature_dim * (num_heads + 1),
+                        feature_dim * (num_heads + 1),
+                        feature_dim,
+                    ]
+                ).cuda(),
             )
             for _ in range(len(layer_names))
         ]
@@ -198,25 +276,25 @@ class AttentionalGNN(nn.Module):
         # edges_intra = generate_edges_intra(size0, size1)
         # edges_cross = generate_edges_cross(size0, size1)
         for (mp, mlp), name in zip(self.layers, self.names):
-            x = torch.permute(x, (0, 2, 1)).float() # -> (B, N, D)
+            x = torch.permute(x, (0, 2, 1)).float()  # -> (B, N, D)
             # print('x', x.shape, x.device)
             # print(name)
             # 1. aggregation: in feature_dim, out feature_dim * num_heads
-            if name == 'cross':
+            if name == "cross":
                 edges = generate_edges_cross(size0, size1)
-            elif name == 'self':
+            elif name == "self":
                 edges = generate_edges_intra(size0, size1)
             msg = mp(x, edges)
             # print('msg', msg.shape, msg.device)
             # 2. cat with x: in feature_dim, out feature_dim*(num_heads + 1)
             # 3. pass through a MLP: in feature_dim * 2, out feature_dim (internal dim see init)
             # 4. skip connection: in feature_dim, out feature_dim
-            xmsg = torch.cat([x, msg], dim=2) # -> (B, N, D*(num_heads+1))
-            xmsg = torch.permute(xmsg, (0, 2, 1)) # -> (B, D*(num_heads+1), N)
+            xmsg = torch.cat([x, msg], dim=2)  # -> (B, N, D*(num_heads+1))
+            xmsg = torch.permute(xmsg, (0, 2, 1))  # -> (B, D*(num_heads+1), N)
             # print('xmsg', xmsg.shape)
-            x = torch.permute(x, (0, 2, 1)) # -> (B, D, N)
+            x = torch.permute(x, (0, 2, 1))  # -> (B, D, N)
             # print('x', x.shape, x.device)
-            x += mlp(xmsg) # -> (B, D, N)
+            x += mlp(xmsg)  # -> (B, D, N)
             # print('x', x.shape, x.device)
         desc0 = x[:, :, :size0]
         desc1 = x[:, :, size0:]
@@ -226,7 +304,7 @@ class AttentionalGNN(nn.Module):
 
 
 def log_sinkhorn_iterations(Z, log_mu, log_nu, iters: int):
-    """ Perform Sinkhorn Normalization in Log-space for stability"""
+    """Perform Sinkhorn Normalization in Log-space for stability"""
     u, v = torch.zeros_like(log_mu), torch.zeros_like(log_nu)
     for _ in range(iters):
         u = log_mu - torch.logsumexp(Z + v.unsqueeze(1), dim=2)
@@ -235,19 +313,20 @@ def log_sinkhorn_iterations(Z, log_mu, log_nu, iters: int):
 
 
 def log_optimal_transport(scores, alpha, iters: int):
-    """ Perform Differentiable Optimal Transport in Log-space for stability"""
+    """Perform Differentiable Optimal Transport in Log-space for stability"""
     b, m, n = scores.shape
     one = scores.new_tensor(1)
-    ms, ns = (m*one).to(scores), (n*one).to(scores)
+    ms, ns = (m * one).to(scores), (n * one).to(scores)
 
     bins0 = alpha.expand(b, m, 1)
     bins1 = alpha.expand(b, 1, n)
     alpha = alpha.expand(b, 1, 1)
 
-    couplings = torch.cat([torch.cat([scores, bins0], -1),
-                           torch.cat([bins1, alpha], -1)], 1)
+    couplings = torch.cat(
+        [torch.cat([scores, bins0], -1), torch.cat([bins1, alpha], -1)], 1
+    )
 
-    norm = - (ms + ns).log()
+    norm = -(ms + ns).log()
     log_mu = torch.cat([norm.expand(m), ns.log()[None] + norm])
     log_nu = torch.cat([norm.expand(n), ms.log()[None] + norm])
     log_mu, log_nu = log_mu[None].expand(b, -1), log_nu[None].expand(b, -1)
@@ -279,6 +358,7 @@ class SuperGlue(nn.Module):
     Networks. In CVPR, 2020. https://arxiv.org/abs/1911.11763
 
     """
+
     default_config = {
         # 'descriptor_dim': 128,
         # 'weights': 'indoor',
@@ -294,17 +374,22 @@ class SuperGlue(nn.Module):
         print('SuperGlue Config:', self.config)
 
         self.kenc = KeypointEncoder(
-            self.config['descriptor_dim'], self.config['keypoint_encoder'])
+            self.config["descriptor_dim"], self.config["keypoint_encoder"]
+        )
 
         self.gnn = AttentionalGNN(
-            self.config['descriptor_dim'], self.config['GNN_layers'], num_heads=4)
+            self.config["descriptor_dim"], self.config["GNN_layers"], num_heads=4
+        )
 
         self.final_proj = nn.Conv1d(
-            self.config['descriptor_dim'], self.config['descriptor_dim'],
-            kernel_size=1, bias=True)
+            self.config["descriptor_dim"],
+            self.config["descriptor_dim"],
+            kernel_size=1,
+            bias=True,
+        )
 
-        bin_score = torch.nn.Parameter(torch.tensor(1.))
-        self.register_parameter('bin_score', bin_score)
+        bin_score = torch.nn.Parameter(torch.tensor(1.0))
+        self.register_parameter("bin_score", bin_score)
 
         # assert self.config['weights'] in ['indoor', 'outdoor']
         # path = Path(__file__).parent
@@ -317,34 +402,37 @@ class SuperGlue(nn.Module):
         """Run SuperGlue on a pair of keypoints and descriptors"""
         # originally double
 
-        desc0, desc1 = data['descriptors0'].float(), data['descriptors1'].float()
-        kpts0, kpts1 = data['keypoints0'].float(), data['keypoints1'].float()
+        # print('Entering superglue')
+        desc0, desc1 = data["descriptors0"].float(), data["descriptors1"].float()
+        kpts0, kpts1 = data["keypoints0"].float(), data["keypoints1"].float()
 
-        desc0 = desc0.transpose(0,1)
-        desc1 = desc1.transpose(0,1)
+        desc0 = desc0.transpose(0, 1)
+        desc1 = desc1.transpose(0, 1)
         kpts0 = torch.reshape(kpts0, (1, -1, 2))
         kpts1 = torch.reshape(kpts1, (1, -1, 2))
 
         if kpts0.shape[1] == 0 or kpts1.shape[1] == 0:  # no keypoints
             shape0, shape1 = kpts0.shape[:-1], kpts1.shape[:-1]
             return {
-                'matches0': kpts0.new_full(shape0, -1, dtype=torch.int)[0],
-                'matches1': kpts1.new_full(shape1, -1, dtype=torch.int)[0],
-                'matching_scores0': kpts0.new_zeros(shape0)[0],
-                'matching_scores1': kpts1.new_zeros(shape1)[0],
-                'skip_train': True
+                "matches0": kpts0.new_full(shape0, -1, dtype=torch.int)[0],
+                "matches1": kpts1.new_full(shape1, -1, dtype=torch.int)[0],
+                "matching_scores0": kpts0.new_zeros(shape0)[0],
+                "matching_scores1": kpts1.new_zeros(shape1)[0],
+                "skip_train": True,
             }
 
-        file_name = data['file_name']
-        all_matches = data['all_matches'].permute(1,2,0) # shape=torch.Size([1, 87, 2])
+        file_name = data["file_name"]
+        all_matches = data["all_matches"].permute(
+            1, 2, 0
+        )  # shape=torch.Size([1, 87, 2])
 
         # Keypoint normalization.
-        kpts0 = normalize_keypoints(kpts0, data['image0'].shape)
-        kpts1 = normalize_keypoints(kpts1, data['image1'].shape)
+        kpts0 = normalize_keypoints(kpts0, data["image0"].shape)
+        kpts1 = normalize_keypoints(kpts1, data["image1"].shape)
 
         # Keypoint MLP encoder.
-        desc0 = desc0 + self.kenc(kpts0, torch.transpose(data['scores0'], 0, 1))
-        desc1 = desc1 + self.kenc(kpts1, torch.transpose(data['scores1'], 0, 1))
+        desc0 = desc0 + self.kenc(kpts0, torch.transpose(data["scores0"], 0, 1))
+        desc1 = desc1 + self.kenc(kpts1, torch.transpose(data["scores1"], 0, 1))
 
         # Multi-layer Transformer network.
         desc0, desc1 = self.gnn(desc0, desc1)
@@ -355,13 +443,13 @@ class SuperGlue(nn.Module):
         mdesc0, mdesc1 = self.final_proj(desc0), self.final_proj(desc1)
 
         # Compute matching descriptor distance.
-        scores = torch.einsum('bdn,bdm->bnm', mdesc0, mdesc1)
-        scores = scores / self.config['descriptor_dim']**.5
+        scores = torch.einsum("bdn,bdm->bnm", mdesc0, mdesc1)
+        scores = scores / self.config["descriptor_dim"] ** 0.5
 
         # Run the optimal transport.
         scores = log_optimal_transport(
-            scores, self.bin_score,
-            iters=self.config['sinkhorn_iterations'])
+            scores, self.bin_score, iters=self.config["sinkhorn_iterations"]
+        )
 
         # Get the matches with score above "match_threshold".
         max0, max1 = scores[:, :-1, :-1].max(2), scores[:, :-1, :-1].max(1)
@@ -371,11 +459,10 @@ class SuperGlue(nn.Module):
         zero = scores.new_tensor(0)
         mscores0 = torch.where(mutual0, max0.values.exp(), zero)
         mscores1 = torch.where(mutual1, mscores0.gather(1, indices1), zero)
-        valid0 = mutual0 & (mscores0 > self.config['match_threshold'])
+        valid0 = mutual0 & (mscores0 > self.config["match_threshold"])
         valid1 = mutual1 & valid0.gather(1, indices1)
         indices0 = torch.where(valid0, indices0, indices0.new_tensor(-1))
         indices1 = torch.where(valid1, indices1, indices1.new_tensor(-1))
-
 
         # check if indexed correctly
 
@@ -386,7 +473,7 @@ class SuperGlue(nn.Module):
             x = all_matches[0][i][0]
             y = all_matches[0][i][1]
             expscores = scores[0][x][y]
-            loss.append(-torch.log( expscores.exp() ))
+            loss.append(-torch.log(expscores.exp()))
             # loss.append(-torch.log( scores[0][x][y].exp() )) # check batch size == 1 ?
         # for p0 in unmatched0:
         #     loss += -torch.log(scores[0][p0][-1])
@@ -400,12 +487,12 @@ class SuperGlue(nn.Module):
         # print('loss_mean', loss_mean)
 
         return {
-            'matches0': indices0[0], # use -1 for invalid match
-            'matches1': indices1[0], # use -1 for invalid match
-            'matching_scores0': mscores0[0],
-            'matching_scores1': mscores1[0],
-            'loss': scores[0][0][0], #loss_mean[0],
-            'skip_train': False
+            "matches0": indices0[0],  # use -1 for invalid match
+            "matches1": indices1[0],  # use -1 for invalid match
+            "matching_scores0": mscores0[0],
+            "matching_scores1": mscores1[0],
+            "loss": loss_mean[0],
+            "skip_train": False,
         }
 
         # scores big value or small value means confidence? log can't take neg value

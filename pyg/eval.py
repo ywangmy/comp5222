@@ -1,25 +1,26 @@
-import torch
-import numpy as np
 import pdb
 
+import numpy as np
 import torch.nn.modules
+from superglue.dataloader import collater
+from superglue.dataloader import HomographyDataLoader
 from superglue.model import superglue
-from superglue.dataloader import HomographyDataLoader, collater
-from torch.autograd import Variable
 from torch import optim
+from torch.autograd import Variable
+
 torch.autograd.set_detect_anomaly(True)
 from torch.utils.data import DataLoader
 import cv2
 from scipy.spatial.distance import cdist
+
 model = superglue()
 
-model.load_state_dict(torch.load('model_100.pt'))
+model.load_state_dict(torch.load("model_100.pt"))
 
 nfeatures = 50
 sift = cv2.xfeatures2d.SIFT_create(nfeatures=nfeatures)
 
-image = cv2.imread(
-    "image goes here")
+image = cv2.imread("image goes here")
 
 height, width = image.shape[:2]
 max_size = max(height, width)
@@ -50,13 +51,16 @@ dists = cdist(kp1_projected, kp2_np)
 
 kp1_np = kp1_np / max_size
 kp2_np = kp2_np / max_size
-descs1 = descs1 / 256.
-descs2 = descs2 / 256.
+descs1 = descs1 / 256.0
+descs2 = descs2 / 256.0
 model.eval()
-sol = model.forward(torch.from_numpy(kp1_np).float().unsqueeze(0).cuda(),
-                    torch.from_numpy(descs1).float().unsqueeze(0).cuda(),
-                    torch.from_numpy(kp2_np).float().unsqueeze(0).cuda(),
-                    torch.from_numpy(descs2).float().unsqueeze(0).cuda(), [])
+sol = model.forward(
+    torch.from_numpy(kp1_np).float().unsqueeze(0).cuda(),
+    torch.from_numpy(descs1).float().unsqueeze(0).cuda(),
+    torch.from_numpy(kp2_np).float().unsqueeze(0).cuda(),
+    torch.from_numpy(descs2).float().unsqueeze(0).cuda(),
+    [],
+)
 matches = torch.where(sol[0, :50, :50] > 0.5)
 matches_cv2 = []
 pts_1 = []
@@ -69,11 +73,16 @@ for idx in range(matches[0].shape[0]):
 
 M2 = cv2.findHomography(np.array(pts_1), np.array(pts_2))
 
-unwarped = cv2.warpPerspective(src=warped, M=M2[0], dsize=(image.shape[1], image.shape[0]), flags=cv2.WARP_INVERSE_MAP)
-cv2.imshow('uw', unwarped)
-cv2.imshow('w', warped)
+unwarped = cv2.warpPerspective(
+    src=warped,
+    M=M2[0],
+    dsize=(image.shape[1], image.shape[0]),
+    flags=cv2.WARP_INVERSE_MAP,
+)
+cv2.imshow("uw", unwarped)
+cv2.imshow("w", warped)
 cv2.waitKey(0)
 pdb.set_trace()
 img_out = cv2.drawMatches(image, kp1, warped, kp2, matches_cv2, None)
-cv2.imshow('a', img_out)
+cv2.imshow("a", img_out)
 cv2.waitKey(0)

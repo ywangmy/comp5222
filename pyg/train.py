@@ -1,12 +1,13 @@
-import torch
-import numpy as np
 import pdb
 
+import numpy as np
 import torch.nn.modules
+from superglue.dataloader import collater
+from superglue.dataloader import HomographyDataLoader
 from superglue.model import superglue
-from superglue.dataloader import HomographyDataLoader, collater
-from torch.autograd import Variable
 from torch import optim
+from torch.autograd import Variable
+
 torch.autograd.set_detect_anomaly(True)
 from torch.utils.data import DataLoader
 
@@ -20,11 +21,13 @@ def generate_keypoints():
     p2 = np.random.randint(0, 100, size=(batch_size, num_pts, 2)).astype(np.float32)
     p2 = p1
 
-    d1 = np.random.normal(0.0, 1.0, size=(batch_size, num_pts, num_features)) + \
-         np.linspace(0, 31, num_features).reshape((1, -1, num_features))
+    d1 = np.random.normal(
+        0.0, 1.0, size=(batch_size, num_pts, num_features)
+    ) + np.linspace(0, 31, num_features).reshape((1, -1, num_features))
 
-    d2 = np.random.normal(0.0, 1.0, size=(batch_size, num_pts, num_features)) + \
-         np.linspace(0, 31, num_features).reshape((1, -1, num_features))
+    d2 = np.random.normal(
+        0.0, 1.0, size=(batch_size, num_pts, num_features)
+    ) + np.linspace(0, 31, num_features).reshape((1, -1, num_features))
 
     d1 -= d1.mean(axis=2).reshape(1, -1, 1)
     d2 -= d2.mean(axis=2).reshape(1, -1, 1)
@@ -40,7 +43,7 @@ def generate_keypoints():
 
 p1, p2, d1, d2 = generate_keypoints()
 
-'''
+"""
 pt1 = torch.from_numpy(np.random.rand(12, 2))
 pt2 = pt1 + torch.from_numpy(np.random.normal(0.0, 0.01, (12, 2)))
 
@@ -66,7 +69,7 @@ F = solver.forward(n1, n2, C2)
 FF = F[1]
 FF = FF / FF.max()
 pdb.set_trace()
-'''
+"""
 
 p1 = torch.from_numpy(p1).float()
 d1 = torch.from_numpy(d1).float()
@@ -75,39 +78,46 @@ p2 = torch.from_numpy(p2).float()
 d2 = torch.from_numpy(d2).float()
 
 model = superglue()
-#model.load_state_dict(torch.load('model_200.pt'))
+# model.load_state_dict(torch.load('model_200.pt'))
 if torch.cuda.is_available():
     model.cuda()
 matches = []
 
-#for i in range(p1.shape[1]):
+# for i in range(p1.shape[1]):
 #    matches.append((i, i))
 
-#for i in range(p1.shape[1], p2.shape[1]):
+# for i in range(p1.shape[1], p2.shape[1]):
 #    matches.append((-1, i))
 
-#model.forward(p1, d1, p2, d2, matches)
+# model.forward(p1, d1, p2, d2, matches)
 
 optimizer = optim.Adam(model.parameters(), lr=1e-4)
 
-#scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=3, verbose=True)
+# scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=3, verbose=True)
+
 
 def worker_init_fn(worker_id):
     np.random.seed(np.random.get_state()[1][0] + worker_id)
 
+
 homography_dataset = HomographyDataLoader()
-dataloader_train = DataLoader(homography_dataset, num_workers=0, batch_size=8, collate_fn=collater, worker_init_fn=worker_init_fn)
+dataloader_train = DataLoader(
+    homography_dataset,
+    num_workers=0,
+    batch_size=8,
+    collate_fn=collater,
+    worker_init_fn=worker_init_fn,
+)
 import time
+
 st = time.time()
 for epoch_num in range(1000):
-
     epoch_loss = []
     epoch_acc = []
 
     np.random.seed()
 
     for inter_num, data in enumerate(dataloader_train):
-
         kp1_np, kp2_np, descs1, descs2, all_matches = data
 
         if torch.cuda.is_available():
@@ -130,6 +140,8 @@ for epoch_num in range(1000):
         print(f"Loss: {loss.item()} | Acc: {acc.item()}")
 
         optimizer.step()
-    print(f"Epoch  {epoch_num} | Loss: {np.mean(epoch_loss):0.2f} | Acc: {100*np.mean(epoch_acc):0.2f}")
+    print(
+        f"Epoch  {epoch_num} | Loss: {np.mean(epoch_loss):0.2f} | Acc: {100*np.mean(epoch_acc):0.2f}"
+    )
     if epoch_num % 100 == 0:
-        torch.save(model.state_dict(), f'model_{epoch_num}.pt')
+        torch.save(model.state_dict(), f"model_{epoch_num}.pt")
