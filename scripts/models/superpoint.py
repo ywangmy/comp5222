@@ -101,11 +101,6 @@ class SuperPoint(nn.Module):
 
     """
     default_config = {
-        'descriptor_dim': 256,
-        'nms_radius': 4,
-        'keypoint_threshold': 0.005,
-        'max_keypoints': -1,
-        'remove_borders': 4,
     }
 
     def __init__(self, config):

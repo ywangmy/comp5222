@@ -111,8 +111,16 @@ parser.add_argument(
     '--train_path', type=str, default='./COCO2014/train2014/',
     help='Path to the directory of training imgs.')
 parser.add_argument(
-    '--epoch', type=int, default=20,
+    '--epoch', type=int, default=100,
     help='Number of epoches')
+
+parser.add_argument(
+    '--descriptor_dim', type=int, default=128
+)
+
+parser.add_argument(
+    '--data_fraction', type=float, default=1.0
+)
 
 
 
@@ -135,19 +143,30 @@ if __name__ == '__main__':
         'superpoint': {
             'nms_radius': opt.nms_radius,
             'keypoint_threshold': opt.keypoint_threshold,
-            'max_keypoints': opt.max_keypoints
+            'max_keypoints': opt.max_keypoints,
+            'descriptor_dim': 256,
+            'nms_radius': 4,
+            'keypoint_threshold': 0.005,
+            'max_keypoints': -1,
+            'remove_borders': 4,
         },
         'superglue': {
             'weights': opt.superglue,
             'sinkhorn_iterations': opt.sinkhorn_iterations,
             'match_threshold': opt.match_threshold,
+            'descriptor_dim': 128,
+            'weights': 'indoor',
+            'keypoint_encoder': [32, 64, 128],
+            'GNN_layers': ['self', 'cross'] * 3,
+            'sinkhorn_iterations': 100,
+            'match_threshold': 0.2,
         }
     }
 
     torch.autograd.set_detect_anomaly(True)
 
     # load training data
-    train_set = SparseDataset(opt.train_path, opt.max_keypoints)
+    train_set = SparseDataset(opt.train_path, opt.max_keypoints, opt.data_fraction)
     train_loader = torch.utils.data.DataLoader(dataset=train_set, shuffle=False, batch_size=opt.batch_size, drop_last=True)
 
     superglue = SuperGlue(config.get('superglue', {}))
@@ -166,7 +185,10 @@ if __name__ == '__main__':
         # track hyperparameters and run metadata
         config={
             "max_keypoints": opt.max_keypoints,
-        }
+            "resize": opt.resize,
+            'learning_rate': opt.learning_rate,
+            'data_fraction': opt.data_fraction
+        }.update(config['superglue'])
     )
 
     # start training
@@ -194,7 +216,7 @@ if __name__ == '__main__':
             Loss = pred['loss']
             # print('Loss', Loss)
             # exit()
-            epoch_loss += Loss.item()
+            epoch_loss +=gi Loss.item()
             mean_loss.append(Loss)
             pbar.set_description(f'running ave. loss {epoch_loss / (i+1)}')
             wandb.log({"loss": Loss.item()})

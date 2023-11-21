@@ -192,8 +192,8 @@ class AttentionalGNN(nn.Module):
         x = torch.cat([desc0, desc1], dim=2).cuda()
         # print(x.shape, x.device)
         size0, size1 = desc0.shape[2], desc1.shape[2]
-        edges_intra = generate_edges_intra(size0, size1)
-        edges_cross = generate_edges_cross(size0, size1)
+        # edges_intra = generate_edges_intra(size0, size1)
+        # edges_cross = generate_edges_cross(size0, size1)
         for (mp, mlp), name in zip(self.layers, self.names):
             x = torch.permute(x, (0, 2, 1)).float() # -> (B, N, D)
             # print('x', x.shape, x.device)
@@ -276,17 +276,18 @@ class SuperGlue(nn.Module):
 
     """
     default_config = {
-        'descriptor_dim': 128,
-        'weights': 'indoor',
-        'keypoint_encoder': [32, 64, 128],
-        'GNN_layers': ['self', 'cross'] * 9,
-        'sinkhorn_iterations': 100,
-        'match_threshold': 0.2,
+        # 'descriptor_dim': 128,
+        # 'weights': 'indoor',
+        # 'keypoint_encoder': [32, 64, 128],
+        # 'GNN_layers': ['self', 'cross'] * 9,
+        # 'sinkhorn_iterations': 100,
+        # 'match_threshold': 0.2,
     }
 
     def __init__(self, config):
         super().__init__()
         self.config = {**self.default_config, **config}
+        print('SuperGlue Config:', self.config)
 
         self.kenc = KeypointEncoder(
             self.config['descriptor_dim'], self.config['keypoint_encoder'])
