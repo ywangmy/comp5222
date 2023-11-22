@@ -154,7 +154,8 @@ class SuperPoint(nn.Module):
     def forward(self, data):
         """Compute keypoints, scores, descriptors for image"""
         # Shared Encoder
-        x = self.relu(self.conv1a(data["image"]))
+        # data is an image
+        x = self.relu(self.conv1a(data))
         x = self.relu(self.conv1b(x))
         x = self.pool(x)
         x = self.relu(self.conv2a(x))

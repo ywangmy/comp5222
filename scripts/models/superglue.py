@@ -66,12 +66,14 @@ def MLP(channels: list, do_bn=True):
 
 def normalize_keypoints(kpts, image_shape):
     """Normalize keypoints locations based on image image_shape"""
-    _, _, height, width = image_shape
-    one = kpts.new_tensor(1)
-    size = torch.stack([one * width, one * height])[None]
-    center = size / 2
-    scaling = size.max(1, keepdim=True).values * 0.7
-    return (kpts - center[:, None, :]) / scaling[:, None, :]
+    # _, _, height, width = image_shape
+    # one = kpts.new_tensor(1)
+    # size = torch.stack([one * width, one * height])[None]
+    # center = size / 2
+    # scaling = size.max(1, keepdim=True).values * 0.7
+    # return (kpts - center[:, None, :]) / scaling[:, None, :]
+
+    return kpts
 
 
 class KeypointEncoder(nn.Module):
@@ -137,39 +139,6 @@ class AttentionalPropagation(nn.Module):
         # return torch.permute(self.mlp(torch.permute(torch.cat([x, message], dim=1), (0,2,1))), (0,2,1))
 
 
-from torch_geometric.nn import GATConv
-
-
-class myAttentionalPropagation(nn.Module):
-    def __init__(self, feature_dim: int, num_heads: int):
-        super().__init__()
-        self.gatconv = GATConv(
-            in_channels=feature_dim,
-            out_channels=feature_dim,
-            heads=num_heads,
-        )  # .cuda()
-
-    def forward(self, x, edge_index):
-        # for PyG
-
-        from torch_geometric.data import Batch, Data
-
-        batch_list = []
-        for i in range(x.shape[0]):
-            batch_list.append(Data(x=x[i, :, :], edge_index=edge_index))
-        batch = Batch.from_data_list(batch_list)
-        # print('batch.x, .edge_index', batch.x.device, batch.x.shape, batch.edge_index.shape)
-        # print(batch, batch[0])
-        # result_list = []
-        # for i in range(x.shape[0]): # edge_index are common
-        #     print('x[i], edge_index', x[i].shape, edge_index.shape)
-        #     result_list.append(self.gatconv(x=x[i], edge_index=edge_index))
-        # return torch.stack(result_list, dim=0)
-        return torch.unsqueeze(
-            self.gatconv(x=batch.x, edge_index=batch.edge_index), dim=0
-        )
-
-
 from itertools import product, permutations
 
 
@@ -224,6 +193,8 @@ class myAttentionalPropagation(nn.Module):
 
     def forward(self, x, edge_index):
         # for PyG
+        batch_size, nnodes, nfeatures = x.shape
+        # print('x', x.shape)
         from torch_geometric.data import Batch, Data
 
         batch_list = []
@@ -237,8 +208,9 @@ class myAttentionalPropagation(nn.Module):
         #     print('x[i], edge_index', x[i].shape, edge_index.shape)
         #     result_list.append(self.gatconv(x=x[i], edge_index=edge_index))
         # return torch.stack(result_list, dim=0)
-        return torch.unsqueeze(
-            self.gatconv(x=batch.x, edge_index=batch.edge_index), dim=0
+        return torch.reshape(
+            self.gatconv(x=batch.x, edge_index=batch.edge_index),
+            (batch_size, nnodes, nfeatures),
         )
 
 
@@ -334,6 +306,7 @@ class myAttentionalGNN(nn.Module):
             # print('x', x.shape, x.device)
             x += mlp(xmsg)  # -> (B, D, N)
             # print('x', x.shape, x.device)
+            # exit()
         x = torch.permute(x, (0, 2, 1)).float()  # -> (B, D, N)
         desc0 = x[:, :, :size0]
         desc1 = x[:, :, size0:]
@@ -472,15 +445,18 @@ class SuperGlue(nn.Module):
                 "skip_train": True,
             }
 
-        file_name = data["file_name"]
+        # file_name = data["file_name"]
         all_matches = data["all_matches"]
         # all_matches = data["all_matches"].permute(
         #     1, 2, 0
         # )  # shape=torch.Size([1, 87, 2])
 
         # Keypoint normalization.
-        kpts0 = normalize_keypoints(kpts0, data["image0"].shape)
-        kpts1 = normalize_keypoints(kpts1, data["image1"].shape)
+        # print(data["image0_shape"], data["image0_shape"].shape)
+        kpts0 = normalize_keypoints(kpts0, data["image0_shape"])
+        kpts1 = normalize_keypoints(kpts1, data["image1_shape"])
+        # print(kpts0)
+        # print(kpts0.shape)
 
         # Keypoint MLP encoder.
         desc0 = desc0 + self.kenc(kpts0, data["scores0"])
@@ -521,30 +497,37 @@ class SuperGlue(nn.Module):
 
         # check if indexed correctly
 
-        loss = []
-        for i in range(len(all_matches[0])):
-            x = all_matches[0][i][0]
-            y = all_matches[0][i][1]
-            expscores = scores[0][x][y]
-            loss.append(-torch.log(expscores.exp()))
-            # loss.append(-torch.log( scores[0][x][y].exp() )) # check batch size == 1 ?
-        # for p0 in unmatched0:
-        #     loss += -torch.log(scores[0][p0][-1])
-        # for p1 in unmatched1:
-        #     loss += -torch.log(scores[0][-1][p1])
-        # print('loss', loss)
-        loss_mean_unreshaped = torch.mean(torch.stack(loss))
+        batch_size = all_matches.shape[0]
+        total_loss = 0
+        for b in range(batch_size):
+            loss = []
+            for i in range(len(all_matches[0])):
+                x = all_matches[0][i][0]
+                y = all_matches[0][i][1]
+                if x == -1 and y == -1:  # padding values
+                    continue
+                expscores = scores[0][x][y]
+                loss.append(-torch.log(expscores.exp()))
+                # loss.append(-torch.log( scores[0][x][y].exp() )) # check batch size == 1 ?
+            # for p0 in unmatched0:
+            #     loss += -torch.log(scores[0][p0][-1])
+            # for p1 in unmatched1:
+            #     loss += -torch.log(scores[0][-1][p1])
+            # print('loss', loss)
+            loss_mean_unreshaped = torch.mean(torch.stack(loss))
 
-        # print('loss_mean_unreshaped', loss_mean_unreshaped)
-        loss_mean = torch.reshape(loss_mean_unreshaped, (1, -1))
-        # print('loss_mean', loss_mean)
+            # print('loss_mean_unreshaped', loss_mean_unreshaped)
+            loss_mean = torch.reshape(loss_mean_unreshaped, (1, -1))
+            # print('loss_mean', loss_mean)
+            total_loss += loss_mean_unreshaped
+        total_loss /= batch_size
 
         return {
             "matches0": indices0[0],  # use -1 for invalid match
             "matches1": indices1[0],  # use -1 for invalid match
             "matching_scores0": mscores0[0],
             "matching_scores1": mscores1[0],
-            "loss": loss_mean[0],
+            "loss": total_loss,  # loss_mean[0],
             "skip_train": False,
         }
 

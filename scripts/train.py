@@ -222,7 +222,9 @@ if __name__ == "__main__":
     torch.autograd.set_detect_anomaly(True)
 
     # load training data
-    train_set = SparseDataset(opt.train_path, opt.max_keypoints, opt.fraction)
+    train_set = SparseDataset(
+        opt.train_path, opt.max_keypoints, opt.fraction, opt.resize
+    )
     train_loader = torch.utils.data.DataLoader(
         dataset=train_set,
         shuffle=False,
