@@ -266,7 +266,7 @@ class myAttentionalGNN(nn.Module):
                     # ).cuda(),
                     nn.Sequential(
                         nn.Linear(feature_dim * (1 + 1), feature_dim).cuda(),
-                        # InstanceNorm(feature_dim).cuda(),
+                        BatchNorm(feature_dim).cuda(),
                         nn.ReLU().cuda(),
                     )
                     # pygMLP([feature_dim * 2, feature_dim], plain_last=False).cuda()
@@ -497,17 +497,16 @@ class SuperGlue(nn.Module):
 
         # check if indexed correctly
 
-        batch_size = all_matches.shape[0]
+        batch_size, num_matches = all_matches.shape[0], all_matches.shape[1]
         total_loss = 0
         for b in range(batch_size):
             loss = []
-            for i in range(len(all_matches[0])):
-                x = all_matches[0][i][0]
-                y = all_matches[0][i][1]
+            for i in range(num_matches):
+                x = all_matches[b][i][0]
+                y = all_matches[b][i][1]
                 if x == -1 and y == -1:  # padding values
                     continue
-                expscores = scores[0][x][y]
-                loss.append(-torch.log(expscores.exp()))
+                loss.append(-torch.log(scores[b][x][y].exp()))
                 # loss.append(-torch.log( scores[0][x][y].exp() )) # check batch size == 1 ?
             # for p0 in unmatched0:
             #     loss += -torch.log(scores[0][p0][-1])
@@ -517,16 +516,16 @@ class SuperGlue(nn.Module):
             loss_mean_unreshaped = torch.mean(torch.stack(loss))
 
             # print('loss_mean_unreshaped', loss_mean_unreshaped)
-            loss_mean = torch.reshape(loss_mean_unreshaped, (1, -1))
+            # loss_mean = torch.reshape(loss_mean_unreshaped, (1, -1))
             # print('loss_mean', loss_mean)
             total_loss += loss_mean_unreshaped
         total_loss /= batch_size
 
         return {
-            "matches0": indices0[0],  # use -1 for invalid match
-            "matches1": indices1[0],  # use -1 for invalid match
-            "matching_scores0": mscores0[0],
-            "matching_scores1": mscores1[0],
+            "matches0": indices0,  # use -1 for invalid match
+            "matches1": indices1,  # use -1 for invalid match
+            "matching_scores0": mscores0,
+            "matching_scores1": mscores1,
             "loss": total_loss,  # loss_mean[0],
             "skip_train": False,
         }

@@ -24,11 +24,57 @@ def resize(img, resize):
 
 
 class ExtractSIFT:
-    def __init__(self):
-        pass
+    def __init__(self, nfeatures, padding: bool = False):
+        self.nfeatures = nfeatures
+        self.padding = padding
+        self.sift = cv2.xfeatures2d.SIFT_create(
+            nfeatures=self.nfeatures  # , contrastThreshold=0.00000
+        )
 
-    def run(self, img):
-        pass
+    def run(self, image):
+        sift = self.sift
+
+        # extract keypoints of the image pair using SIFT
+        kp1, descs1 = sift.detectAndCompute(image, None)
+        # kp2, descs2 = sift.detectAndCompute(warped, None)
+
+        # limit the number of keypoints
+        # kp1_num = min(self.nfeatures, len(kp1))
+
+        kp1_num = self.nfeatures
+        kp1 = kp1[:kp1_num]
+
+        kp1_np = np.array([(kp.pt[0], kp.pt[1]) for kp in kp1])
+
+        # confidence of each key point
+        scores1_np = np.array([kp.response for kp in kp1])
+
+        if len(kp1_np) < 64:
+            # print(len(kp1_np))
+            if self.padding:
+                res = int(self.nfeatures - len(kp1_np))
+                pad_kp = (
+                    np.random.uniform(size=[res, 2])
+                    * (image.shape[0] + image.shape[1])
+                    / 2
+                )
+                pad_scroes1 = np.zeros([res])  # scores := 0
+                pad_desc1 = np.zeros((res, 128))
+
+                if len(kp1_np) == 0:
+                    kp1_np = pad_kp
+                    scores1_np = pad_scroes1
+                    descs1 = pad_desc1
+                else:
+                    kp1_np = np.concatenate([kp1_np, pad_kp], axis=0)
+                    scores1_np = np.concatenate([scores1_np, pad_scroes1], axis=0)
+                    descs1 = np.concatenate([descs1, pad_desc1], axis=0)
+                # print(kp1_np)
+                # print(descs1)
+                # print(scores1_np)
+        kp1_np = kp1_np[:kp1_num, :]
+        descs1 = descs1[:kp1_num, :]
+        return kp1_np, descs1, scores1_np
 
 
 class ExtractSuperpoint(object):
@@ -69,18 +115,19 @@ class ExtractSuperpoint(object):
         # padding randomly
         if self.padding:
             if len(kpt) < self.num_kp:
-                res = int(self.num_kp - len(kpt))
-                pad_x, pad_desc = np.random.uniform(size=[res, 2]) * (
-                    img.shape[0] + img.shape[1]
-                ) / 2, np.random.uniform(size=[res, 256])
-                pad_kpt, pad_desc = (
-                    np.concatenate([pad_x, np.zeros([res, 1])], axis=-1),
-                    pad_desc / np.linalg.norm(pad_desc, axis=-1)[:, np.newaxis],
+                res = int(self.num_kp - len(kpt))  # number of remaining
+                pad_kpt = (
+                    np.random.uniform(size=[res, 2]) * (img.shape[0] + img.shape[1]) / 2
                 )
-                kpt, desc = np.concatenate([kpt, pad_kpt], axis=0), np.concatenate(
-                    [desc, pad_desc], axis=0
-                )
-        return kpt, desc
+                pad_desc = np.random.uniform(size=[res, 256])
+                pad_desc = pad_desc / np.linalg.norm(pad_desc, axis=-1)[:, np.newaxis]
+
+                score = np.concatenate([score, np.zeros(res)], axis=0)
+                # pad_kpt = np.concatenate([pad_x, np.zeros([res, 1])], axis=-1) # scores := 0
+
+                kpt = np.concatenate([kpt, pad_kpt], axis=0)
+                desc = np.concatenate([desc, pad_desc], axis=0)
+        return kpt, desc, score
 
 
 class SparseDataset(Dataset):
@@ -92,13 +139,11 @@ class SparseDataset(Dataset):
         # Select a fraction of the total files
         subset_size = int(len(all_files) * fraction)
         self.files = all_files[:subset_size]
-
         self.nfeatures = nfeatures
-        self.sift = cv2.xfeatures2d.SIFT_create(
-            nfeatures=self.nfeatures, contrastThreshold=0.00000
-        )
         self.matcher = cv2.BFMatcher_create(cv2.NORM_L1, crossCheck=False)
         self.resize = resize
+
+        self.extractor = ExtractSIFT(nfeatures, True)
 
     def __len__(self):
         return len(self.files)
@@ -110,7 +155,7 @@ class SparseDataset(Dataset):
             image = cv2.resize(
                 image.astype("float32"), (self.resize[0], self.resize[1])
             ).astype("uint8")
-        sift = self.sift
+
         width, height = image.shape[:2]
         corners = np.array(
             [[0, 0], [0, height], [width, 0], [width, height]], dtype=np.float32
@@ -123,25 +168,15 @@ class SparseDataset(Dataset):
             src=image, M=M, dsize=(image.shape[1], image.shape[0])
         )  # return an image type
 
-        # extract keypoints of the image pair using SIFT
-        kp1, descs1 = sift.detectAndCompute(image, None)
-        kp2, descs2 = sift.detectAndCompute(warped, None)
+        #
 
-        # limit the number of keypoints
-        # kp1_num = min(self.nfeatures, len(kp1))
-        # kp2_num = min(self.nfeatures, len(kp2))
-        if len(kp1) < 64 or len(kp2) < 64:
-            print(len(kp1), len(kp2))
-        kp1_num = kp2_num = self.nfeatures
-        kp1 = kp1[:kp1_num]
-        kp2 = kp2[:kp2_num]
-
-        kp1_np = np.array([(kp.pt[0], kp.pt[1]) for kp in kp1])
-        kp2_np = np.array([(kp.pt[0], kp.pt[1]) for kp in kp2])
-
+        kp1_np, descs1, scores1_np = self.extractor.run(image)
+        kp2_np, descs2, scores2_np = self.extractor.run(warped)
+        # print(kp1_np.shape, descs1.shape, scores1_np.shape)
+        # print(kp2_np.shape, descs2.shape, scores2_np.shape)
         # skip this image pair if no keypoints detected in image
         if (
-            len(kp1) <= 1 or len(kp2) <= 1
+            len(kp1_np) <= 1 or len(kp2_np) <= 1
         ):  # https://github.com/yingxin-jia/SuperGlue-pytorch/issues/31, originally < <
             return {
                 "keypoints0": torch.zeros([0, 0, 2], dtype=torch.float),
@@ -153,17 +188,8 @@ class SparseDataset(Dataset):
                 "file_name": file_name,
             }
 
-        # confidence of each key point
-        scores1_np = np.array([kp.response for kp in kp1])
-        scores2_np = np.array([kp.response for kp in kp2])
-
-        kp1_np = kp1_np[:kp1_num, :]
-        kp2_np = kp2_np[:kp2_num, :]
-        descs1 = descs1[:kp1_num, :]
-        descs2 = descs2[:kp2_num, :]
-
         # obtain the matching matrix of the image pair
-        matched = self.matcher.match(descs1, descs2)
+        # matched = self.matcher.match(descs1, descs2)
         kp1_projected = cv2.perspectiveTransform(kp1_np.reshape((1, -1, 2)), M)[0, :, :]
         dists = cdist(kp1_projected, kp2_np)
 
@@ -183,12 +209,12 @@ class SparseDataset(Dataset):
         MN2 = np.concatenate(
             [
                 missing1[np.newaxis, :],
-                (len(kp2)) * np.ones((1, len(missing1)), dtype=np.int64),
+                (len(kp2_np)) * np.ones((1, len(missing1)), dtype=np.int64),
             ]
         )
         MN3 = np.concatenate(
             [
-                (len(kp1)) * np.ones((1, len(missing2)), dtype=np.int64),
+                (len(kp1_np)) * np.ones((1, len(missing2)), dtype=np.int64),
                 missing2[np.newaxis, :],
             ]
         )

@@ -15,6 +15,17 @@
    ./scripts/train.py
    ```
 
+Ori:
+
+- 9l 256b = 7134Mb
+- 5l 256b = 4760Mb
+
+GAT:
+
+- 9l 16b = 6664Mb
+- 9l 32b = 13242Mb
+- 5l 32b = 8566Mb
+
 ## Task Introduction
 
 In many tasks of computer vision, matching discrete features/objects across different frames is a difficult combinatorial optimization problem which is NP-complete, and is usually relaxed as an optimal transport problem.

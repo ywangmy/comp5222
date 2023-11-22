@@ -219,7 +219,7 @@ if __name__ == "__main__":
         },
     }
 
-    torch.autograd.set_detect_anomaly(True)
+    # torch.autograd.set_detect_anomaly(True)
 
     # load training data
     train_set = SparseDataset(
@@ -260,24 +260,24 @@ if __name__ == "__main__":
         epoch_loss = 0
         # originally double
         superglue.float().train()
-        for i, pred in enumerate(pbar := tqdm(train_loader, total=len(train_loader))):
-            for k in pred:
+        for i, input in enumerate(pbar := tqdm(train_loader, total=len(train_loader))):
+            for k in input:
                 if k != "file_name" and k != "image0" and k != "image1":
-                    if type(pred[k]) == torch.Tensor:
-                        pred[k] = Variable(pred[k].cuda())
+                    if type(input[k]) == torch.Tensor:
+                        input[k] = Variable(input[k].cuda())
                     else:
-                        pred[k] = Variable(torch.stack(pred[k]).cuda())
+                        input[k] = Variable(torch.stack(input[k]).cuda())
 
-            data = superglue(pred)  # originally not .float()
-            for k, v in pred.items():
-                pred[k] = v[0]
-            pred = {**pred, **data}
+            output = superglue(input)  # originally not .float()
+            for k, v in input.items():
+                input[k] = v[0]
+            input = {**input, **output}
 
-            if pred["skip_train"] == True:  # image has no keypoint
+            if input["skip_train"] == True:  # image has no keypoint
                 continue
 
             # process loss
-            Loss = pred["loss"]
+            Loss = output["loss"]
 
             # print('Loss', Loss)
             # exit()
@@ -309,18 +309,18 @@ if __name__ == "__main__":
                 # Visualize the matches.
                 superglue.eval()
                 image0, image1 = (
-                    pred["image0"].cpu().numpy()[0] * 255.0,
-                    pred["image1"].cpu().numpy()[0] * 255.0,
+                    input["image0"].cpu().numpy()[0] * 255.0,
+                    input["image1"].cpu().numpy()[0] * 255.0,
                 )
 
                 # import pdb; pdb.set_trace()
                 kpts0, kpts1 = (
-                    pred["keypoints0"].cpu().numpy(),
-                    pred["keypoints1"].cpu().numpy(),
+                    input["keypoints0"].cpu().numpy(),
+                    input["keypoints1"].cpu().numpy(),
                 )
                 matches, conf = (
-                    pred["matches0"].cpu().detach().numpy(),
-                    pred["matching_scores0"].cpu().detach().numpy(),
+                    input["matches0"][0].cpu().detach().numpy(),
+                    input["matching_scores0"][0].cpu().detach().numpy(),
                 )
                 image0 = read_image_modified(image0, opt.resize, opt.resize_float)
                 image1 = read_image_modified(image1, opt.resize, opt.resize_float)
@@ -332,7 +332,7 @@ if __name__ == "__main__":
                     str(i), opt.viz_extension
                 )
                 color = cm.jet(mconf)
-                stem = pred["file_name"]
+                stem = input["file_name"]
                 text = []
 
                 make_matching_plot(
