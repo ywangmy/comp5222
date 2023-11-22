@@ -168,7 +168,7 @@ parser.add_argument("--fraction", type=float, default=1.0)
 
 parser.add_argument("--model", default="gat")
 parser.add_argument("--gnn_layers", type=int, default=3)
-
+parser.add_argument("--graph", type=int, default=2)
 
 if __name__ == "__main__":
     opt = parser.parse_args()
@@ -213,7 +213,8 @@ if __name__ == "__main__":
             "descriptor_dim": 128,
             "weights": "indoor",
             "keypoint_encoder": [32, 64, 128],
-            "GNN_layers": ["self", "cross"] * opt.gnn_layers,
+            "GNN_layers": (["self", "cross"] if opt.graph == 2 else ["union"])
+            * opt.gnn_layers,
             "sinkhorn_iterations": 100,
             "match_threshold": 0.2,
         },

@@ -83,6 +83,7 @@ class KeypointEncoder(nn.Module):
         nn.init.constant_(self.encoder[-1].bias, 0.0)
 
     def forward(self, kpts, scores):
+        print(kpts.shape, scores.shape)
         inputs = torch.cat(
             [kpts.transpose(1, 2).float(), scores.unsqueeze(1).float()], dim=1
         )
@@ -147,6 +148,7 @@ class myAttentionalPropagation(nn.Module):
             in_channels=feature_dim,
             out_channels=feature_dim,
             heads=num_heads,
+            edge_dim=2,
         )  # .cuda()
 
     def forward(self, x, edge_index):
@@ -190,8 +192,13 @@ def generate_edges_intra(len1, len2, with_attr: bool = False):
         + len1
     )
     edges = torch.cat([edges1, edges2], dim=1).cuda()
-    # edges_attr = torch.repeat(torch.tensor([0, 1]))
-    return edges
+    edges_attr = (
+        torch.tensor([0, 1]).repeat(len1 * (len1 - 1) + len2 * (len2 - 1), 1).cuda()
+    )
+    if with_attr == False:
+        return edges
+    else:
+        return edges, edges_attr
 
 
 def generate_edges_cross(len1, len2, with_attr: bool = False):
@@ -206,7 +213,19 @@ def generate_edges_cross(len1, len2, with_attr: bool = False):
         .contiguous()
     )
     edges = torch.cat([edges1, edges2], dim=1).cuda()
-    return edges
+    edges_attr = torch.tensor([1, 0]).repeat(len1 * len2 + len2 * len1, 1).cuda()
+    if with_attr == False:
+        return edges
+    else:
+        return edges, edges_attr
+
+
+def generate_edges_union(len1, len2, with_attr: bool = False):
+    edges_inter, edges_attr_inter = generate_edges_intra(len1, len2, with_attr)
+    edges_cross, edges_attr_cross = generate_edges_cross(len1, len2, with_attr)
+    edges = torch.cat([edges_inter, edges_cross], dim=1).cuda()
+    edges_attr = torch.cat([edges_attr_inter, edges_attr_cross], dim=0).cuda()
+    return edges, edges_attr
 
 
 from torch_geometric.nn import GATConv
@@ -222,13 +241,15 @@ class myAttentionalPropagation(nn.Module):
             concat=False,
         )  # .cuda()
 
-    def forward(self, x, edge_index):
+    def forward(self, x, edge_index, edge_attr=None):
         # for PyG
         from torch_geometric.data import Batch, Data
 
         batch_list = []
         for i in range(x.shape[0]):
-            batch_list.append(Data(x=x[i, :, :], edge_index=edge_index))
+            batch_list.append(
+                Data(x=x[i, :, :], edge_index=edge_index, edge_attr=edge_attr)
+            )
         batch = Batch.from_data_list(batch_list)
         # print('batch.x, .edge_index', batch.x.device, batch.x.shape, batch.edge_index.shape)
         # print(batch, batch[0])
@@ -238,7 +259,10 @@ class myAttentionalPropagation(nn.Module):
         #     result_list.append(self.gatconv(x=x[i], edge_index=edge_index))
         # return torch.stack(result_list, dim=0)
         return torch.unsqueeze(
-            self.gatconv(x=batch.x, edge_index=batch.edge_index), dim=0
+            self.gatconv(
+                x=batch.x, edge_index=batch.edge_index, edge_attr=batch.edge_attr
+            ),
+            dim=0,
         )
 
 
@@ -301,6 +325,12 @@ class myAttentionalGNN(nn.Module):
                 )
                 for _ in range(len(layer_names))
             ]
+            # from torch_geometric.nn.models import GAT
+            # self.gnn = GAT(in_channels=feature_dim,
+            #                hidden_channels=feature_dim,
+            #                num_layers=3,
+            #                out_channels=feature_dim,
+            #                )
         self.names = layer_names
 
     def forward(self, desc0, desc1):
@@ -313,16 +343,32 @@ class myAttentionalGNN(nn.Module):
         # edges_intra = generate_edges_intra(size0, size1)
         # edges_cross = generate_edges_cross(size0, size1)
         x = torch.permute(x, (0, 2, 1)).float()  # -> (B, N, D)
+        # generate_edge_func = generate_edges_union
+        # edge_index, edge_attr = generate_edge_func(size0, size1, with_attr=True)
+        # from torch_geometric.data import Batch, Data
+
+        # batch_list = []
+        # for i in range(x.shape[0]):
+        #     batch_list.append(Data(x=x[i, :, :], edge_index=edge_index, edge_attr=edge_attr))
+        # batch = Batch.from_data_list(batch_list)
+        # x = torch.unsqueeze(
+        #     self.gnn(x=batch.x, edge_index=batch.edge_index, edge_attr=batch.edge_attr), dim=0
+        # )
         for (mp, mlp), name in zip(self.layers, self.names):
             # print('x', x.shape, x.device)
 
             # print(name)
             # 1. aggregation: in feature_dim, out feature_dim * num_heads
+
             if name == "cross":
-                edges = generate_edges_cross(size0, size1)
+                generate_edge_func = generate_edges_cross
             elif name == "self":
-                edges = generate_edges_intra(size0, size1)
-            msg = mp(x, edges)
+                generate_edge_func = generate_edges_intra
+            elif name == "union":
+                generate_edge_func = generate_edges_union
+            edges, edges_attr = generate_edge_func(size0, size1, with_attr=True)
+            # print(edges_attr.shape)
+            msg = mp(x, edges, edges_attr)
             # print('msg', msg.shape, msg.device)
             # 2. cat with x: in feature_dim, out feature_dim*(num_heads + 1)
             # 3. pass through a MLP: in feature_dim * 2, out feature_dim (internal dim see init)
@@ -482,9 +528,11 @@ class SuperGlue(nn.Module):
         kpts1 = normalize_keypoints(kpts1, data["image1"].shape)
 
         # Keypoint MLP encoder.
+        print(kpts0.shape, data["scores0"].shape)
         desc0 = desc0 + self.kenc(kpts0, torch.transpose(data["scores0"], 0, 1))
         desc1 = desc1 + self.kenc(kpts1, torch.transpose(data["scores1"], 0, 1))
-
+        print("gnn out desc0 desc1", desc0.shape, desc0.shape)
+        exit()
         # Multi-layer Transformer network.
         desc0, desc1 = self.gnn(desc0, desc1)
         # print('gnn out desc0 desc1', desc0.shape, desc0.shape)
