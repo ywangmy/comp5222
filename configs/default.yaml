@@ -1,0 +1,65 @@
+%YAML 1.2
+---
+train:
+    batch_size: 32
+    epochs: 10
+    learning_rate: 0.0001
+
+    dataset:
+        COCO:
+            path: ./COCO2014/train2014
+            fraction: 0.001
+            resize: [640, 480] # Resize the input image before running inference. If two numbers, resize to the exact dimensions, if one number, resize the max dimension, if -1, do not resize
+            shuffle: true
+
+        ScanNet:
+            path: ./ScanNet/train
+            fraction: 0.001
+            resize: [640, 480] # Resize the input image before running inference. If two numbers, resize to the exact dimensions, if one number, resize the max dimension, if -1, do not resize
+            shuffle: true
+
+eval:
+    output_dir: ./dump_match_pairs/
+    batch_size: 32
+    eval_interval: 5 # evaluate 1 epoch every "eval_interval" training epochs
+
+    dataset:
+        COCO:
+            path: ./COCO2014/eval2014
+            fraction: 0.001
+            resize: [640, 480] # Resize the input image before running inference. If two numbers, resize to the exact dimensions, if one number, resize the max dimension, if -1, do not resize
+            shuffle: true
+
+        ScanNet:
+            path: ./ScanNet/eval
+            fraction: 0.001
+            resize: [640, 480] # Resize the input image before running inference. If two numbers, resize to the exact dimensions, if one number, resize the max dimension, if -1, do not resize
+            shuffle: true
+
+superglue:
+    num_layers: 3
+    sinkhorn_iterations: 10
+    match_threshold: 0.2
+    descriptor_dim: 256 # Dimension of the descriptor
+
+feature_extraction:
+    max_keypoints: 64 # Maximum number of keypoints
+    descriptor_dim: 256 # Dimension of the descriptor
+
+    extractor:
+        SIFT:
+            contrastThreshold: 0.04
+            edgeThreshold: 10
+            sigma: 1.6
+
+        superpoint:
+            keypoint_threshold: 0.005 # SuperPoint keypoint detector confidence threshold
+            nms_radius: 4 # SuperPoint Non Maximum Suppression (NMS) radius
+            match_threshold: 0.2 # SuperGlue match threshold
+            remove_borders: 4
+            model_path: ./superpoint_v1.pth
+
+
+
+visualize: true # Visualize the matches and dump the plots
+visualize_output_dir: ./dump_match_pairs/   # Output directory for the visualization

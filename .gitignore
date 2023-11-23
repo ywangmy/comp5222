@@ -186,6 +186,7 @@ poetry.toml
 pyrightconfig.json
 
 ### VisualStudioCode ###
+**/.vscode
 **/.vscode/*
 .vscode/*
 !.vscode/settings.json
@@ -207,11 +208,10 @@ pyrightconfig.json
 
 # End of https://www.toptal.com/developers/gitignore/api/visualstudiocode,python,jupyternotebooks
 
-scripts/COCO2014
-
-scripts/dump_match_pairs*
-*.swp
-**/__pycache__/
-scripts/wandb/*
-scripts/*.pth
-scripts/ckpt*
+**/COCO2014
+**/dump_match_pairs
+**/*.swp
+**/__pycache__
+**/wandb
+**/*.pth
+**/ckpt*

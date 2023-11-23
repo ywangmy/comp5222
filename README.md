@@ -2,18 +2,60 @@
 
 ## Usage
 
-1. Environment setup
+### 1. Environment Setup
 
-   ```Shell
-   conda env create -f environment.yml
-   conda activate gnn-feature-matching
-   ```
+```Shell
+conda env create -f environment.yml
+conda activate gnn-feature-matching
+```
 
-1. Run training
+### 2. Download Data
 
-   ```Shell
-   ./scripts/train.py
-   ```
+Download the COCO2014 dataset files for training
+
+```Shell
+wget http://images.cocodataset.org/zips/train2014.zip
+```
+
+Download the validation set
+
+```Shell
+wget http://images.cocodataset.org/zips/val2014.zip
+```
+
+Download the test set
+
+```Shell
+wget http://images.cocodataset.org/zips/test2014.zip
+```
+
+### 3. Training Directions
+
+To train the SuperGlue with default parameters, run the following command:
+
+```shell
+./train.py
+```
+
+### 4. Additional useful command line parameters
+
+- Use `--epoch` to set the number of epochs (default: `20`).
+- Use `--train_path` to set the path to the directory of training images.
+- Use `--eval_output_dir` to set the path to the directory in which the visualizations is written (default: `dump_match_pairs/`).
+- Use `--show_keypoints` to visualize the detected keypoints (default: `False`).
+- Use `--viz_extension` to set the visualization file extension (default: `png`). Use pdf for highest-quality.
+
+### 5. Visualization Demo
+
+The matches are colored by their predicted confidence in a jet colormap (Red: more confident, Blue: less confident).
+
+You should see images like this inside of `dump_match_pairs/`
+
+<img src="assets/8349_matches.png" width="800">
+<img src="assets/4599_matches2.png" width="800">
+<img src="assets/2799_matches.png" width="800">
+<img src="assets/3849_matches2.png" width="800">
+<img src="assets/3949_matches.png" width="800">
 
 ## Task Introduction
 
@@ -42,7 +84,7 @@ In real-world applications, the algorithm is supposed to run in real time on edg
 1. Use node and edge pooling to reduce the graph scale in intermediate layers and recover
    the scale in the final output.
 
-1. Merge the inter-image graphs and intra-image graphs into one by labeling the two types of edges, so that the two aggregation schemes can be carried out simultaneously to reduce the number of layers and simplify the implementation. In addition, we also plan to experiment with the SuperGlue framework with different GNNs and compare their performance.
+1. Merge the inter-image graphs and intra-image graphs into one by labeling the two types of edges, so that the two aggregation schemes can be carried out simultaneously to reduce the number of layers and simplify the implementation.
 
 ## Team Member
 
