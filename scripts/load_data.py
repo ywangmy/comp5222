@@ -28,7 +28,7 @@ class ExtractSIFT:
         self.nfeatures = nfeatures
         self.padding = padding
         self.sift = cv2.xfeatures2d.SIFT_create(
-            nfeatures=self.nfeatures  # , contrastThreshold=0.00000
+            nfeatures=self.nfeatures, contrastThreshold=0.00001
         )
 
     def run(self, image):
@@ -49,7 +49,7 @@ class ExtractSIFT:
         # confidence of each key point
         scores1_np = np.array([kp.response for kp in kp1])
 
-        if len(kp1_np) < 64:
+        if len(kp1_np) < self.nfeatures:
             # print(len(kp1_np))
             if self.padding:
                 res = int(self.nfeatures - len(kp1_np))

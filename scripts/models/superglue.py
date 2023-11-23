@@ -73,7 +73,9 @@ def normalize_keypoints(kpts, image_shape):
     # scaling = size.max(1, keepdim=True).values * 0.7
     # return (kpts - center[:, None, :]) / scaling[:, None, :]
 
-    return kpts
+    return torch.stack(
+        [(kpts[:, :, 0] - 320) / 320, (kpts[:, :, 0] - 240) / 240], dim=2
+    )
 
 
 class KeypointEncoder(nn.Module):
@@ -142,7 +144,7 @@ class AttentionalPropagation(nn.Module):
 from itertools import product, permutations
 
 
-def generate_edges_intra(len1, len2, with_attr: bool = False):
+def generate_edges_intra(len1, len2, with_type: bool = False):
     edges1 = (
         torch.tensor(
             list(permutations(range(len1), 2)), dtype=torch.long, requires_grad=False
@@ -159,11 +161,15 @@ def generate_edges_intra(len1, len2, with_attr: bool = False):
         + len1
     )
     edges = torch.cat([edges1, edges2], dim=1).cuda()
-    # edges_attr = torch.repeat(torch.tensor([0, 1]))
-    return edges
+    edge_type = torch.zeros(len1 * (len1 - 1) + len2 * (len2 - 1), dtype=int).cuda()
+
+    if with_type == False:
+        return edges
+    else:
+        return edges, edge_type
 
 
-def generate_edges_cross(len1, len2, with_attr: bool = False):
+def generate_edges_cross(len1, len2, with_type: bool = False):
     edges1 = (
         torch.tensor(list(product(range(len1), range(len1, len1 + len2))))
         .t()
@@ -175,23 +181,43 @@ def generate_edges_cross(len1, len2, with_attr: bool = False):
         .contiguous()
     )
     edges = torch.cat([edges1, edges2], dim=1).cuda()
-    return edges
+    edge_type = torch.ones(len1 * len2 + len2 * len1, dtype=int).cuda()
+    if with_type == False:
+        return edges
+    else:
+        return edges, edge_type
 
 
-from torch_geometric.nn import GATConv
+def generate_edges_union(len1, len2, with_type: bool = False):
+    edges_inter, edge_type_inter = generate_edges_intra(len1, len2, with_type)
+    edges_cross, edge_type_cross = generate_edges_cross(len1, len2, with_type)
+    edges = torch.cat([edges_inter, edges_cross], dim=1).cuda()
+    edge_type = torch.cat([edge_type_inter, edge_type_cross], dim=0).cuda()
+    return edges, edge_type
 
 
 class myAttentionalPropagation(nn.Module):
-    def __init__(self, feature_dim: int, num_heads: int):
+    def __init__(self, model: str, feature_dim: int, num_heads: int = 1):
         super().__init__()
-        self.gatconv = GATConv(
-            in_channels=feature_dim,
-            out_channels=feature_dim,
-            heads=num_heads,
-            concat=False,
-        )  # .cuda()
+        from torch_geometric.nn import GATConv, RGATConv
 
-    def forward(self, x, edge_index):
+        if model == "gat":
+            self.conv = GATConv(
+                in_channels=feature_dim,
+                out_channels=feature_dim,
+                heads=num_heads,
+                concat=False,
+            )  # .cuda()
+        elif model == "rgat":
+            self.conv = RGATConv(
+                in_channels=feature_dim,
+                out_channels=feature_dim,
+                heads=num_heads,
+                concat=False,
+                num_relations=2,
+            )
+
+    def forward(self, x, edge_index, edge_type=None):
         # for PyG
         batch_size, nnodes, nfeatures = x.shape
         # print('x', x.shape)
@@ -199,17 +225,26 @@ class myAttentionalPropagation(nn.Module):
 
         batch_list = []
         for i in range(x.shape[0]):
-            batch_list.append(Data(x=x[i, :, :], edge_index=edge_index))
+            batch_list.append(
+                Data(x=x[i, :, :], edge_index=edge_index, edge_type=edge_type)
+            )
         batch = Batch.from_data_list(batch_list)
-        # print('batch.x, .edge_index', batch.x.device, batch.x.shape, batch.edge_index.shape)
+        print(
+            "batch.x, .edge_index",
+            batch.x.device,
+            batch.x.shape,
+            batch.edge_index.shape,
+        )
         # print(batch, batch[0])
         # result_list = []
         # for i in range(x.shape[0]): # edge_index are common
         #     print('x[i], edge_index', x[i].shape, edge_index.shape)
-        #     result_list.append(self.gatconv(x=x[i], edge_index=edge_index))
+        #     result_list.append(self.conv(x=x[i], edge_index=edge_index))
         # return torch.stack(result_list, dim=0)
         return torch.reshape(
-            self.gatconv(x=batch.x, edge_index=batch.edge_index),
+            self.conv(
+                x=batch.x, edge_index=batch.edge_index, edge_type=batch.edge_type
+            ),
             (batch_size, nnodes, nfeatures),
         )
 
@@ -237,42 +272,34 @@ class AttentionalGNN(nn.Module):
         return desc0, desc1
 
 
-class myAttentionalGNN(nn.Module):
+class myGAT(nn.Module):
     def __init__(self, model: str, feature_dim: int, layer_names: list, num_heads):
         super().__init__()
         from torch_geometric.nn import MLP as pygMLP
         from torch_geometric.nn.norm import InstanceNorm, BatchNorm
 
         self.feature_dim = feature_dim
-        if model == "ori":
-            self.layers = nn.ModuleList(
-                [
-                    AttentionalPropagation(feature_dim, 4)
-                    for _ in range(len(layer_names))
-                ]
+        self.layers = [
+            (
+                myAttentionalPropagation(
+                    model=model, feature_dim=feature_dim, num_heads=num_heads
+                ).cuda(),
+                MLP(
+                    [
+                        feature_dim * (1 + 1),
+                        feature_dim * (1 + 1),
+                        feature_dim,
+                    ]
+                ).cuda(),
+                # nn.Sequential(
+                #     nn.Linear(feature_dim * (1 + 1), feature_dim).cuda(),
+                #     # BatchNorm(feature_dim).cuda(),
+                #     nn.ReLU().cuda(),
+                # )
+                # pygMLP([feature_dim * 2, feature_dim], plain_last=False).cuda()
             )
-        elif model == "gat":
-            self.layers = [
-                (
-                    myAttentionalPropagation(
-                        feature_dim=feature_dim, num_heads=num_heads
-                    ).cuda(),
-                    # MLP(
-                    #     [
-                    #         feature_dim * (1 + 1),
-                    #         feature_dim * (1 + 1),
-                    #         feature_dim,
-                    #     ]
-                    # ).cuda(),
-                    nn.Sequential(
-                        nn.Linear(feature_dim * (1 + 1), feature_dim).cuda(),
-                        BatchNorm(feature_dim).cuda(),
-                        nn.ReLU().cuda(),
-                    )
-                    # pygMLP([feature_dim * 2, feature_dim], plain_last=False).cuda()
-                )
-                for _ in range(len(layer_names))
-            ]
+            for _ in range(len(layer_names))
+        ]
         self.names = layer_names
 
     def forward(self, desc0, desc1):
@@ -284,8 +311,8 @@ class myAttentionalGNN(nn.Module):
         size0, size1 = desc0.shape[2], desc1.shape[2]
         # edges_intra = generate_edges_intra(size0, size1)
         # edges_cross = generate_edges_cross(size0, size1)
-        x = torch.permute(x, (0, 2, 1)).float()  # -> (B, N, D)
         for (mp, mlp), name in zip(self.layers, self.names):
+            x = torch.permute(x, (0, 2, 1)).float()  # -> (B, N, D)
             # print('x', x.shape, x.device)
 
             # print(name)
@@ -300,14 +327,242 @@ class myAttentionalGNN(nn.Module):
             # 3. pass through a MLP: in feature_dim * 2, out feature_dim (internal dim see init)
             # 4. skip connection: in feature_dim, out feature_dim
             xmsg = torch.cat([x, msg], dim=2)  # -> (B, N, D*(num_heads+1))
-            # xmsg = torch.permute(xmsg, (0, 2, 1))  # -> (B, D*(num_heads+1), N)
+            xmsg = torch.permute(xmsg, (0, 2, 1))  # -> (B, D*(num_heads+1), N)
             # print('xmsg', xmsg.shape)
-            # x = torch.permute(x, (0, 2, 1))  # -> (B, D, N)
+            x = torch.permute(x, (0, 2, 1))  # -> (B, D, N)
             # print('x', x.shape, x.device)
             x += mlp(xmsg)  # -> (B, D, N)
             # print('x', x.shape, x.device)
             # exit()
-        x = torch.permute(x, (0, 2, 1)).float()  # -> (B, D, N)
+        # x = torch.permute(x, (0, 2, 1)).float()  # -> (B, D, N)
+        desc0 = x[:, :, :size0]
+        desc1 = x[:, :, size0:]
+        # print(desc0.shape, desc1.shape, desc0.device, desc1.device)
+        return desc0, desc1
+
+
+class myWholeGAT(nn.Module):
+    def __init__(self, model: str, feature_dim: int, layer_names: list, num_heads):
+        super().__init__()
+        from torch_geometric.nn import MLP as pygMLP
+        from torch_geometric.nn.norm import InstanceNorm, BatchNorm
+
+        self.feature_dim = feature_dim
+        from torch_geometric.nn import GATConv
+
+        gat_config = {
+            "in_channels": feature_dim,
+            "out_channels": feature_dim,
+            "num_relations": 2,
+            "heads": num_heads,
+            "concat": False,
+        }
+        self.conv = []
+        self.mlp = []
+        for i in range(len(layer_names)):
+            self.conv.append(GATConv(**gat_config).cuda())
+            self.mlp.append(pygMLP([feature_dim * 2, feature_dim]).cuda())
+        self.names = layer_names
+
+    def forward(self, desc0, desc1):
+        # (B, D, N), (B, D, N)
+
+        # print(desc0.shape, desc1.shape, desc0.device, desc1.device)
+        x = torch.cat([desc0, desc1], dim=2).cuda()
+        # print(x.shape, x.device)
+        size0, size1 = desc0.shape[2], desc1.shape[2]
+        edges_intra = generate_edges_intra(size0, size1)
+        edges_cross = generate_edges_cross(size0, size1)
+        # edges, edge_type = generate_edges_union(size0, size1, True)
+        # print('edges', edges.shape, edge_type.shape)
+        x = torch.permute(x, (0, 2, 1)).float()  # -> (B, N, D)
+
+        batch_size, num_nodes, nfeatures = x.shape
+        # print('x', x.shape)
+        from torch_geometric.data import Batch, Data
+
+        batch_intra_list = []
+        batch_cross_list = []
+        batch_x_list = []
+        # x_ = x.deepcopy()
+        for i in range(x.shape[0]):
+            batch_intra_list.append(
+                Data(x=x[i, :, :], edge_index=edges_intra, num_nodes=num_nodes)
+            )
+            batch_cross_list.append(
+                Data(x=x[i, :, :], edge_index=edges_cross, num_nodes=num_nodes)
+            )
+            batch_x_list.append(Data(x=x[i, :, :]))
+        batch_intra = Batch.from_data_list(batch_intra_list)
+        batch_cross = Batch.from_data_list(batch_cross_list)
+        batch_x = Batch.from_data_list(batch_x_list)
+
+        now_x = batch_x.x
+        print("batch_x", batch_x.x.shape)
+
+        for i in range(len(self.names)):
+            if self.names[i] == "self":
+                # batch_intra.x = now_x
+                msg1 = self.conv[i](x=now_x, edge_index=batch_intra.edge_index).relu()
+                msg2 = self.mlp[i](torch.cat([now_x, msg1], dim=1))
+                now_x += msg2
+                # now_x = batch_intra.x
+            else:
+                # batch_cross.x = now_x
+                msg1 = self.conv[i](x=now_x, edge_index=batch_cross.edge_index).relu()
+                msg2 = self.mlp[i](torch.cat([now_x, msg1], dim=1))
+                now_x += msg2
+                # now_x = batch_cross.x
+
+        x = torch.reshape(now_x, (batch_size, num_nodes, nfeatures))
+        x = torch.permute(x, (0, 2, 1))  # -> (B, D, N)
+        desc0 = x[:, :, :size0]
+        desc1 = x[:, :, size0:]
+        # print(desc0.shape, desc1.shape, desc0.device, desc1.device)
+        return desc0, desc1
+
+
+class myRGAT(nn.Module):
+    def __init__(self, model: str, feature_dim: int, layer_names: list, num_heads):
+        super().__init__()
+        from torch_geometric.nn import MLP as pygMLP
+        from torch_geometric.nn.norm import InstanceNorm, BatchNorm
+
+        self.feature_dim = feature_dim
+        self.layers = [
+            (
+                myAttentionalPropagation(
+                    model=model, feature_dim=feature_dim, num_heads=num_heads
+                ).cuda(),
+                MLP(
+                    [
+                        feature_dim * (1 + 1),
+                        feature_dim * (1 + 1),
+                        feature_dim,
+                    ]
+                ).cuda(),
+            )
+            for _ in range(len(layer_names))
+        ]
+        self.names = layer_names
+
+    def forward(self, desc0, desc1):
+        # (B, D, N), (B, D, N)
+
+        # print(desc0.shape, desc1.shape, desc0.device, desc1.device)
+        x = torch.cat([desc0, desc1], dim=2).cuda()
+        # print(x.shape, x.device)
+        size0, size1 = desc0.shape[2], desc1.shape[2]
+        # edges_intra = generate_edges_intra(size0, size1)
+        # edges_cross = generate_edges_cross(size0, size1)
+        edges, edge_type = generate_edges_union(size0, size1, True)
+        # print('edges', edges.shape, edge_type.shape)
+        for (mp, mlp), name in zip(self.layers, self.names):
+            x = torch.permute(x, (0, 2, 1)).float()  # -> (B, N, D)
+            # print('x', x.shape, x.device)
+            # print(name)
+            # 1. aggregation: in feature_dim, out feature_dim * num_heads
+            msg = mp(x, edges, edge_type)
+            # print('msg', msg.shape, msg.device)
+            # 2. cat with x: in feature_dim, out feature_dim*(num_heads + 1)
+            # 3. pass through a MLP: in feature_dim * 2, out feature_dim (internal dim see init)
+            # 4. skip connection: in feature_dim, out feature_dim
+            xmsg = torch.cat([x, msg], dim=2)  # -> (B, N, D*(num_heads+1))
+            xmsg = torch.permute(xmsg, (0, 2, 1))  # -> (B, D*(num_heads+1), N)
+            # print('xmsg', xmsg.shape)
+            x = torch.permute(x, (0, 2, 1))  # -> (B, D, N)
+            # print('x', x.shape, x.device)
+            x += mlp(xmsg)  # -> (B, D, N)
+            # print('x', x.shape, x.device)
+        desc0 = x[:, :, :size0]
+        desc1 = x[:, :, size0:]
+        # print(desc0.shape, desc1.shape, desc0.device, desc1.device)
+        return desc0, desc1
+
+
+class myWholeRGAT(nn.Module):
+    def __init__(
+        self,
+        model: str,
+        feature_dim: int,
+        layer_names: list,
+        num_heads: int = 1,
+        edge_pool: list = None,
+    ):
+        super().__init__()
+        from torch_geometric.nn import MLP as pygMLP
+        from torch_geometric.nn.norm import InstanceNorm, BatchNorm
+        from torch_geometric.nn.pool import knn_graph
+
+        self.feature_dim = feature_dim
+        from torch_geometric.nn import RGATConv
+
+        rgat_config = {
+            "in_channels": feature_dim,
+            "out_channels": feature_dim,
+            "num_relations": 2,
+            "heads": num_heads,
+            "concat": False,
+        }
+        self.conv = []
+        self.lin = []
+        self.norm = []
+        self.pool = []
+        for i in range(len(layer_names)):
+            self.conv.append(RGATConv(**rgat_config).cuda())
+            self.lin.append(nn.Linear(feature_dim * 2, feature_dim).cuda())
+            self.norm.append(BatchNorm(feature_dim).cuda())
+            if edge_pool == None:
+                self.pool.append(None)
+            else:
+                self.pool.append(knn_graph)
+        self.names = layer_names
+
+    def forward(self, desc0, desc1):
+        # (B, D, N), (B, D, N)
+
+        # print(desc0.shape, desc1.shape, desc0.device, desc1.device)
+        x = torch.cat([desc0, desc1], dim=2).cuda()
+        # print(x.shape, x.device)
+        size0, size1 = desc0.shape[2], desc1.shape[2]
+        edges_intra = generate_edges_intra(size0, size1)
+        edges_cross = generate_edges_cross(size0, size1)
+        edges, edge_type = generate_edges_union(size0, size1, True)
+        # print('edges', edges.shape, edge_type.shape)
+        x = torch.permute(x, (0, 2, 1)).float()  # -> (B, N, D)
+
+        batch_size, num_nodes, nfeatures = x.shape
+        # print('x', x.shape)
+        from torch_geometric.data import Batch, Data
+
+        batch_list = []
+        batch_intra_list = []
+        batch_cross_list = []
+        for i in range(x.shape[0]):
+            batch_list.append(Data(x=x[i, :, :], edge_index=edges, edge_type=edge_type))
+            batch_intra_list.append(Data(edge_index=edges_intra, num_nodes=num_nodes))
+            batch_cross_list.append(Data(edge_index=edges_cross, num_nodes=num_nodes))
+        batch = Batch.from_data_list(batch_list)
+        batch_intra = Batch.from_data_list(batch_intra_list)
+        batch_cross = Batch.from_data_list(batch_cross_list)
+
+        for i in range(len(self.names)):
+            msg1 = self.conv[i](
+                x=batch.x, edge_index=batch.edge_index, edge_type=batch.edge_type
+            ).relu()
+            msg2 = self.lin[i](torch.cat([batch.x, msg1], dim=1))
+            msg3 = self.norm[i](msg2)
+            batch.x += msg3
+            if self.pool[i] != None:
+                pooled_x_intra, batch_intra.edge_index = self.pool[i](
+                    batch.x, batch_intra.edge_index, batch.batch
+                )
+
+        x = torch.reshape(
+            batch.x,
+            (batch_size, num_nodes, nfeatures),
+        )
+        x = torch.permute(x, (0, 2, 1))  # -> (B, D, N)
         desc0 = x[:, :, :size0]
         desc1 = x[:, :, size0:]
         # print(desc0.shape, desc1.shape, desc0.device, desc1.device)
@@ -392,13 +647,37 @@ class SuperGlue(nn.Module):
             self.gnn = AttentionalGNN(
                 self.config["descriptor_dim"], self.config["GNN_layers"], num_heads=4
             )
-        else:
-            self.gnn = myAttentionalGNN(
+
+        elif config["model"] == "gat":
+            self.gnn = myGAT(
                 self.config["model"],
                 self.config["descriptor_dim"],
                 self.config["GNN_layers"],
                 num_heads=4,
             )
+        # elif config['model'] == 'wgat':
+        #     self.gnn = myWholeGAT(
+        #         self.config["model"],
+        #         self.config["descriptor_dim"],
+        #         self.config["GNN_layers"],
+        #         num_heads=4,
+        #     )
+
+        elif config["model"] == "rgat":
+            self.gnn = myRGAT(
+                self.config["model"],
+                self.config["descriptor_dim"],
+                self.config["GNN_layers"],
+                num_heads=4,
+            ).cuda()
+
+        elif config["model"] == "wrgat":
+            self.gnn = myWholeRGAT(
+                self.config["model"],
+                self.config["descriptor_dim"],
+                self.config["GNN_layers"],
+                num_heads=4,
+            ).cuda()
 
         self.final_proj = nn.Conv1d(
             self.config["descriptor_dim"],
@@ -499,6 +778,8 @@ class SuperGlue(nn.Module):
 
         batch_size, num_matches = all_matches.shape[0], all_matches.shape[1]
         total_loss = 0
+        # print('batch_size', batch_size)
+        batch_loss = []
         for b in range(batch_size):
             loss = []
             for i in range(num_matches):
@@ -514,11 +795,13 @@ class SuperGlue(nn.Module):
             #     loss += -torch.log(scores[0][-1][p1])
             # print('loss', loss)
             loss_mean_unreshaped = torch.mean(torch.stack(loss))
+            batch_loss.append(loss_mean_unreshaped.item())
 
             # print('loss_mean_unreshaped', loss_mean_unreshaped)
             # loss_mean = torch.reshape(loss_mean_unreshaped, (1, -1))
             # print('loss_mean', loss_mean)
             total_loss += loss_mean_unreshaped
+        # print(batch_loss)
         total_loss /= batch_size
 
         return {

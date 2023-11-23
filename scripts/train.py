@@ -54,7 +54,7 @@ parser.add_argument(
 parser.add_argument(
     "--max_keypoints",
     type=int,
-    default=64,
+    default=128,
     help="Maximum number of keypoints detected by Superpoint"
     " ('-1' keeps all keypoints)",
 )
@@ -151,7 +151,7 @@ parser.add_argument(
     "visualizations are written",
 )
 
-parser.add_argument("--learning_rate", type=int, default=0.0001, help="Learning rate")
+parser.add_argument("--learning_rate", type=float, default=0.0001, help="Learning rate")
 
 parser.add_argument("--batch_size", type=int, default=1, help="batch_size")
 parser.add_argument(
@@ -168,6 +168,7 @@ parser.add_argument("--fraction", type=float, default=1.0)
 
 parser.add_argument("--model", default="gat")
 parser.add_argument("--gnn_layers", type=int, default=3)
+parser.add_argument("--graph", type=int, default=2)
 
 
 if __name__ == "__main__":
@@ -188,7 +189,8 @@ if __name__ == "__main__":
 
     # store viz results
     eval_output_dir = (
-        Path(opt.eval_output_dir) / f"{opt.model}-{opt.fraction}-{opt.match_threshold}"
+        Path(opt.eval_output_dir)
+        / f"{opt.model}-({opt.fraction}|{opt.learning_rate}-{opt.batch_size})-{opt.match_threshold}-{opt.max_keypoints}-{opt.gnn_layers}"
     )
     eval_output_dir.mkdir(exist_ok=True, parents=True)
     print(
@@ -213,13 +215,12 @@ if __name__ == "__main__":
             "descriptor_dim": 128,
             "weights": "indoor",
             "keypoint_encoder": [32, 64, 128],
-            "GNN_layers": ["self", "cross"] * opt.gnn_layers,
+            "GNN_layers": (["self", "cross"] if opt.graph == 2 else ["union"]),
             "sinkhorn_iterations": 100,
-            "match_threshold": 0.2,
         },
     }
 
-    # torch.autograd.set_detect_anomaly(True)
+    torch.autograd.set_detect_anomaly(True)
 
     # load training data
     train_set = SparseDataset(
@@ -256,11 +257,14 @@ if __name__ == "__main__":
     )
 
     # start training
+
     for epoch in range(1, opt.epoch + 1):
         epoch_loss = 0
         # originally double
         superglue.float().train()
-        for i, input in enumerate(pbar := tqdm(train_loader, total=len(train_loader))):
+        num_iters = len(train_loader)
+        last_plot_id = 0
+        for i, input in enumerate(pbar := tqdm(train_loader, total=num_iters)):
             for k in input:
                 if k != "file_name" and k != "image0" and k != "image1":
                     if type(input[k]) == torch.Tensor:
@@ -293,7 +297,8 @@ if __name__ == "__main__":
             optimizer.step()
 
             # for every 50 images, print progress and visualize the matches
-            if (i + 1) % 5 == 0:
+            if (i + 1 - last_plot_id) > (int)(num_iters * 0.1):
+                last_plot_id = i + 1
                 print(
                     "Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}".format(
                         epoch,
