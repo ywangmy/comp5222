@@ -215,11 +215,18 @@ def generate_edges_cross(len1, len2, with_type: bool = False):
 
 
 def generate_edges_union(len1, len2, with_type: bool = False):
-    edges_inter, edge_type_inter = generate_edges_intra(len1, len2, with_type)
-    edges_cross, edge_type_cross = generate_edges_cross(len1, len2, with_type)
-    edges = torch.cat([edges_inter, edges_cross], dim=1).cuda()
-    edge_type = torch.cat([edge_type_inter, edge_type_cross], dim=0).cuda()
-    return edges, edge_type
+    if with_type:
+        edges_inter, edge_type_inter = generate_edges_intra(len1, len2, with_type)
+        edges_cross, edge_type_cross = generate_edges_cross(len1, len2, with_type)
+        edge_type = torch.cat([edge_type_inter, edge_type_cross], dim=0).cuda()
+    else:
+        edges_inter = generate_edges_intra(len1, len2, with_type)
+        edges_cross = generate_edges_cross(len1, len2, with_type)
+    edges = torch.cat([edges_inter, edges_cross], dim=1)
+    if with_type == False:
+        return edges
+    else:
+        return edges, edge_type
 
 
 class myAttentionalPropagation(nn.Module):
@@ -336,6 +343,8 @@ class myGAT(nn.Module):
                 edges = generate_edges_cross(size0, size1)
             elif name == "self":
                 edges = generate_edges_intra(size0, size1)
+            elif name == "union":
+                edges = generate_edges_union(size0, size1)
             msg = mp(x, edges)
             # 2. cat with x: in feature_dim, out feature_dim*(1 + 1)
             # 3. pass through a MLP: in feature_dim * 2, out feature_dim (internal dim see init)
@@ -510,7 +519,6 @@ class myWholeRGAT(nn.Module):
             "num_relations": 2,
             "heads": num_heads,
             "concat": False,
-            # 'return_attention_weights': True,
         }
         self.conv = []
         self.lin = []
@@ -522,12 +530,30 @@ class myWholeRGAT(nn.Module):
             self.norm.append(BatchNorm(feature_dim).cuda())
         self.names = layer_names
 
-    # def edge_pool(batch, attention_weights, k):
-    #     from torch_geometric.data import Batch, Data
-    #     from torch_geometric.utils import unbatch_edge_index
-    #     unbatched_edge_index = unbatch_edge_index(batch.edge_index)
-    #     batch_size = len(unbatched_edge_index)
-    #     for b in range(batch_size):
+    def edge_pool(self, batch, attention_weights, k):
+        from torch_geometric.data import Batch, Data
+
+        # from torch_geometric.utils import unbatch_edge_index
+        batch_list = Batch.to_data_list(batch)
+        # edge_index_list = unbatch_edge_index(batch.edge_index)
+        batch_size = len(batch_list)
+
+        id_start = 0
+        for b in range(batch_size):
+            num_edges = batch_list[b].edge_index.shape[-1]
+            id_end = id_start + num_edges
+            attention_weights_now = torch.mean(
+                attention_weights[id_start:id_end, :], dim=1
+            )
+            # print(attention_weights_now.shape)
+            topk_ids = torch.topk(attention_weights_now, int(k * num_edges)).indices
+
+            batch_list[b].edge_index = batch_list[b].edge_index[:, topk_ids]
+            batch_list[b].edge_type = batch_list[b].edge_type[topk_ids]
+
+            id_start = id_end
+        batch = Batch.from_data_list(batch_list)
+        return batch
 
     def forward(self, desc0, desc1):
         # (B, D, N), (B, D, N)
@@ -537,8 +563,8 @@ class myWholeRGAT(nn.Module):
         x = torch.cat([desc0, desc1], dim=2).cuda()
         # print(x.shape, x.device)
         size0, size1 = desc0.shape[2], desc1.shape[2]
-        edges_intra = generate_edges_intra(size0, size1)
-        edges_cross = generate_edges_cross(size0, size1)
+        # edges_intra = generate_edges_intra(size0, size1)
+        # edges_cross = generate_edges_cross(size0, size1)
         edges, edge_type = generate_edges_union(size0, size1, True)
         # print('edges', edges.shape, edge_type.shape)
         x = torch.permute(x, (0, 2, 1)).float()  # -> (B, N, D)
@@ -547,8 +573,8 @@ class myWholeRGAT(nn.Module):
         # print('x', x.shape)
 
         batch_list = []
-        batch_intra_list = []
-        batch_cross_list = []
+        # batch_intra_list = []
+        # batch_cross_list = []
         for i in range(x.shape[0]):
             batch_list.append(Data(x=x[i, :, :], edge_index=edges, edge_type=edge_type))
             # batch_intra_list.append(Data(edge_index=edges_intra, num_nodes=num_nodes))
@@ -559,22 +585,26 @@ class myWholeRGAT(nn.Module):
         from torch_geometric.nn.pool import knn_graph
 
         for i in range(len(self.names)):
-            print("x", batch.x.shape)
-            msg1 = self.conv[i](
-                x=batch.x, edge_index=batch.edge_index, edge_type=batch.edge_type
-            ).relu()
-            print("msg1", msg1.shape)
+            # print("x", batch.x.shape)
+            msg1, (_, attention_weights) = self.conv[i](
+                x=batch.x,
+                edge_index=batch.edge_index,
+                edge_type=batch.edge_type,
+                return_attention_weights=True,
+            )
+            msg1 = msg1.relu()
+            # print('attn', attention_weights.shape)
+            # print("msg1", msg1.shape)
             msg2 = self.lin[i](torch.cat([batch.x, msg1], dim=1))
-            print("msg2", msg2.shape)
+            # print("msg2", msg2.shape)
             msg3 = self.norm[i](msg2)
             batch.x += msg3
             if self.pool[i] != 1:
-                new_edge_index = knn_graph(
-                    batch.x, k=int(num_nodes * self.pool[i]), batch=batch.batch
+                batch = self.edge_pool(
+                    batch, attention_weights=attention_weights, k=self.pool[i]
                 )
-                batch.edge_index = new_edge_index
-            print("i", i, self.names[i])
-            print("batch.edge_index", batch.edge_index.shape)
+            # print("i", i, self.names[i])
+            # print("batch.edge_index", batch.edge_index.shape)
 
         x = torch.reshape(
             batch.x,
@@ -703,7 +733,7 @@ class SuperGlue(nn.Module):
                 self.config["descriptor_dim"],
                 self.config["GNN_layers"],
                 num_heads=4,
-                edge_pool=[1, 0.5, 1, 0.25, 1, 0.125, 1, 1, 1],
+                edge_pool=[0.1, 0.5, 0.5, 0.5, 1, 1, 1, 1, 1],
             ).cuda()
 
         self.final_proj = nn.Conv1d(

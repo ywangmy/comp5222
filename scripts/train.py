@@ -54,7 +54,7 @@ parser.add_argument(
 parser.add_argument(
     "--max_keypoints",
     type=int,
-    default=128,
+    default=48,
     help="Maximum number of keypoints detected by Superpoint"
     " ('-1' keeps all keypoints)",
 )
@@ -169,6 +169,7 @@ parser.add_argument("--fraction", type=float, default=1.0)
 parser.add_argument("--model", default="gat")
 parser.add_argument("--gnn_layers", type=int, default=3)
 parser.add_argument("--graph", type=int, default=2)
+parser.add_argument("--edge_pool", type=list, default=None)
 
 
 if __name__ == "__main__":
@@ -187,15 +188,9 @@ if __name__ == "__main__":
         opt.fast_viz and opt.viz_extension == "pdf"
     ), "Cannot use pdf extension with --fast_viz"
 
-    # store viz results
-    eval_output_dir = (
-        Path(opt.eval_output_dir)
-        / f"{opt.model}-({opt.fraction}|{opt.learning_rate}-{opt.batch_size})-{opt.match_threshold}-{opt.max_keypoints}-{opt.gnn_layers}"
-    )
-    eval_output_dir.mkdir(exist_ok=True, parents=True)
-    print(
-        "Will write visualization images to", 'directory "{}"'.format(eval_output_dir)
-    )
+    if opt.model == "rgat" or opt.model == "wrgat":
+        opt.graph = 1
+    opt.graph
     config = {
         "superpoint": {
             "nms_radius": opt.nms_radius,
@@ -220,6 +215,16 @@ if __name__ == "__main__":
             "sinkhorn_iterations": 100,
         },
     }
+
+    # store viz results
+    eval_output_dir = (
+        Path(opt.eval_output_dir)
+        / f"{opt.model}-({opt.fraction}|{opt.learning_rate}-{opt.batch_size})-{opt.match_threshold}-{opt.max_keypoints}-{opt.gnn_layers}x{opt.graph}-{opt.edge_pool==None}"
+    )
+    eval_output_dir.mkdir(exist_ok=True, parents=True)
+    print(
+        "Will write visualization images to", 'directory "{}"'.format(eval_output_dir)
+    )
 
     # torch.autograd.set_detect_anomaly(True)
 
@@ -373,7 +378,9 @@ if __name__ == "__main__":
         # save checkpoint when an epoch finishes
         epoch_loss /= len(train_loader)
         model_out_path = f"ckpt/{opt.model}/model_epoch_{epoch}.pth"
-        Path(f"ckpt/{opt.model}").mkdir(parents=True, exist_ok=True)
+        Path(
+            f"ckpt/{opt.model}-{opt.gnn_layers}x{opt.graph}-{opt.edge_pool==None}"
+        ).mkdir(parents=True, exist_ok=True)
         torch.save(superglue, model_out_path)
         print(
             "Epoch [{}/{}] done. Epoch Loss {}. Checkpoint saved to {}".format(
