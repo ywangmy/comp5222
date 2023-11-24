@@ -215,12 +215,13 @@ if __name__ == "__main__":
             "descriptor_dim": 128,
             "weights": "indoor",
             "keypoint_encoder": [32, 64, 128],
-            "GNN_layers": (["self", "cross"] if opt.graph == 2 else ["union"]),
+            "GNN_layers": (["self", "cross"] if opt.graph == 2 else ["union"])
+            * opt.gnn_layers,
             "sinkhorn_iterations": 100,
         },
     }
 
-    torch.autograd.set_detect_anomaly(True)
+    # torch.autograd.set_detect_anomaly(True)
 
     # load training data
     train_set = SparseDataset(
@@ -252,6 +253,7 @@ if __name__ == "__main__":
             "resize": opt.resize,
             "learning_rate": opt.learning_rate,
             "fraction": opt.fraction,
+            "batch_size": opt.batch_size,
         }
         | config["superglue"],
     )

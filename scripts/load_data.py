@@ -205,25 +205,16 @@ class SparseDataset(Dataset):
         missing1 = np.setdiff1d(np.arange(kp1_np.shape[0]), min1[matches])
         missing2 = np.setdiff1d(np.arange(kp2_np.shape[0]), matches)
 
+        all_matches = len(kp1_np) * np.ones((self.nfeatures, 2), dtype=np.int64)
         MN = np.concatenate([min1[matches][np.newaxis, :], matches[np.newaxis, :]])
-        MN2 = np.concatenate(
-            [
-                missing1[np.newaxis, :],
-                (len(kp2_np)) * np.ones((1, len(missing1)), dtype=np.int64),
-            ]
-        )
-        MN3 = np.concatenate(
-            [
-                (len(kp1_np)) * np.ones((1, len(missing2)), dtype=np.int64),
-                missing2[np.newaxis, :],
-            ]
-        )
-        all_matches = np.concatenate([MN, MN2, MN3], axis=1)
-
-        pad_matches = -1 * np.ones(
-            (2, self.nfeatures * 2 - all_matches.shape[1]), dtype=np.int64
-        )
-        all_matches = np.concatenate([all_matches, pad_matches], axis=1)
+        MN = np.transpose(MN)
+        num_matches = MN.shape[0]
+        for i in range(num_matches):
+            x = MN[i][0]
+            y = MN[i][1]
+            all_matches[x][0] = y
+            all_matches[y][1] = x
+        # print(all_matches.shape)
 
         # kp1_np = kp1_np.reshape((1, -1, 2))
         # kp2_np = kp2_np.reshape((1, -1, 2))

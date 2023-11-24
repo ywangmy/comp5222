@@ -215,3 +215,5 @@ scripts/dump_match_pairs*
 scripts/wandb/*
 scripts/*.pth
 scripts/ckpt*
+scripts/scannet_eval.tar.gz
+SGMNet
