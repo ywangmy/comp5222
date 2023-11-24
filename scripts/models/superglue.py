@@ -318,12 +318,6 @@ class myGAT(nn.Module):
                         feature_dim,
                     ]
                 ).cuda(),
-                # nn.Sequential(
-                #     nn.Linear(feature_dim * (1 + 1), feature_dim).cuda(),
-                #     BatchNorm(feature_dim).cuda(),
-                #     nn.ReLU().cuda(),
-                # )
-                # pygMLP([feature_dim * 2, feature_dim], plain_last=True).cuda()
             )
             for _ in range(len(layer_names))
         ]
@@ -332,39 +326,26 @@ class myGAT(nn.Module):
     def forward(self, desc0, desc1):
         # (B, D, N), (B, D, N)
 
-        # print(desc0.shape, desc1.shape, desc0.device, desc1.device)
         x = torch.cat([desc0, desc1], dim=2).cuda()
-        # print(x.shape, x.device)
         size0, size1 = desc0.shape[2], desc1.shape[2]
-        # edges_intra = generate_edges_intra(size0, size1)
-        # edges_cross = generate_edges_cross(size0, size1)
 
         for (mp, mlp), name in zip(self.layers, self.names):
-            # print('x', x.shape, x.device)
-            # print(name)
             x = torch.permute(x, (0, 2, 1)).float()  # -> (B, N, D)
-            # 1. aggregation: in feature_dim, out feature_dim * num_heads
+            # 1. aggregation: in feature_dim, out feature_dim * 1
             if name == "cross":
                 edges = generate_edges_cross(size0, size1)
             elif name == "self":
                 edges = generate_edges_intra(size0, size1)
             msg = mp(x, edges)
-            # print('msg', msg.shape, msg.device)
-            # 2. cat with x: in feature_dim, out feature_dim*(num_heads + 1)
+            # 2. cat with x: in feature_dim, out feature_dim*(1 + 1)
             # 3. pass through a MLP: in feature_dim * 2, out feature_dim (internal dim see init)
             # 4. skip connection: in feature_dim, out feature_dim
-            xmsg = torch.cat([x, msg], dim=2)  # -> (B, N, D*(num_heads+1))
-            xmsg = torch.permute(xmsg, (0, 2, 1))  # -> (B, D*(num_heads+1), N)
-            # print('xmsg', xmsg.shape)
+            xmsg = torch.cat([x, msg], dim=2)  # -> (B, N, D*(1+1))
+            xmsg = torch.permute(xmsg, (0, 2, 1))  # -> (B, D*(1+1), N)
             x = torch.permute(x, (0, 2, 1))  # -> (B, D, N)
-            # print('x', x.shape, x.device)
             x += mlp(xmsg)  # -> (B, D, N)
-            # print('x', x.shape, x.device)
-            # exit()
-        # x = torch.permute(x, (0, 2, 1)).float()  # -> (B, D, N)
         desc0 = x[:, :, :size0]
         desc1 = x[:, :, size0:]
-        # print(desc0.shape, desc1.shape, desc0.device, desc1.device)
         return desc0, desc1
 
 
