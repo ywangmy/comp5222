@@ -54,7 +54,7 @@ parser.add_argument(
 parser.add_argument(
     "--max_keypoints",
     type=int,
-    default=64,
+    default=48,
     help="Maximum number of keypoints detected by Superpoint"
     " ('-1' keeps all keypoints)",
 )
@@ -151,7 +151,7 @@ parser.add_argument(
     "visualizations are written",
 )
 
-parser.add_argument("--learning_rate", type=int, default=0.0001, help="Learning rate")
+parser.add_argument("--learning_rate", type=float, default=0.0001, help="Learning rate")
 
 parser.add_argument("--batch_size", type=int, default=1, help="batch_size")
 parser.add_argument(
@@ -169,6 +169,8 @@ parser.add_argument("--fraction", type=float, default=1.0)
 parser.add_argument("--model", default="gat")
 parser.add_argument("--gnn_layers", type=int, default=3)
 parser.add_argument("--graph", type=int, default=2)
+parser.add_argument("--edge_pool", type=list, default=None)
+
 
 if __name__ == "__main__":
     opt = parser.parse_args()
@@ -186,14 +188,9 @@ if __name__ == "__main__":
         opt.fast_viz and opt.viz_extension == "pdf"
     ), "Cannot use pdf extension with --fast_viz"
 
-    # store viz results
-    eval_output_dir = (
-        Path(opt.eval_output_dir) / f"{opt.model}-{opt.fraction}-{opt.match_threshold}"
-    )
-    eval_output_dir.mkdir(exist_ok=True, parents=True)
-    print(
-        "Will write visualization images to", 'directory "{}"'.format(eval_output_dir)
-    )
+    if opt.model == "rgat" or opt.model == "wrgat":
+        opt.graph = 1
+    opt.graph
     config = {
         "superpoint": {
             "nms_radius": opt.nms_radius,
@@ -216,16 +213,31 @@ if __name__ == "__main__":
             "GNN_layers": (["self", "cross"] if opt.graph == 2 else ["union"])
             * opt.gnn_layers,
             "sinkhorn_iterations": 100,
-            "match_threshold": 0.2,
         },
     }
 
-    torch.autograd.set_detect_anomaly(True)
+    # store viz results
+    eval_output_dir = (
+        Path(opt.eval_output_dir)
+        / f"{opt.model}-({opt.fraction}|{opt.learning_rate}-{opt.batch_size})-{opt.match_threshold}-{opt.max_keypoints}-{opt.gnn_layers}x{opt.graph}-{opt.edge_pool==None}"
+    )
+    eval_output_dir.mkdir(exist_ok=True, parents=True)
+    print(
+        "Will write visualization images to", 'directory "{}"'.format(eval_output_dir)
+    )
+
+    # torch.autograd.set_detect_anomaly(True)
 
     # load training data
-    train_set = SparseDataset(opt.train_path, opt.max_keypoints, opt.fraction)
+    train_set = SparseDataset(
+        opt.train_path, opt.max_keypoints, opt.fraction, opt.resize
+    )
     train_loader = torch.utils.data.DataLoader(
-        dataset=train_set, shuffle=False, batch_size=opt.batch_size, drop_last=True
+        dataset=train_set,
+        shuffle=False,
+        batch_size=opt.batch_size,
+        drop_last=True,
+        # collate_fn=train_set.collate_fn,
     )
 
     superglue = SuperGlue(config.get("superglue", {}))
@@ -246,33 +258,37 @@ if __name__ == "__main__":
             "resize": opt.resize,
             "learning_rate": opt.learning_rate,
             "fraction": opt.fraction,
+            "batch_size": opt.batch_size,
         }
         | config["superglue"],
     )
 
     # start training
+
     for epoch in range(1, opt.epoch + 1):
         epoch_loss = 0
         # originally double
         superglue.float().train()
-        for i, pred in enumerate(pbar := tqdm(train_loader, total=len(train_loader))):
-            for k in pred:
+        num_iters = len(train_loader)
+        last_plot_id = 0
+        for i, input in enumerate(pbar := tqdm(train_loader, total=num_iters)):
+            for k in input:
                 if k != "file_name" and k != "image0" and k != "image1":
-                    if type(pred[k]) == torch.Tensor:
-                        pred[k] = Variable(pred[k].cuda())
+                    if type(input[k]) == torch.Tensor:
+                        input[k] = Variable(input[k].cuda())
                     else:
-                        pred[k] = Variable(torch.stack(pred[k]).cuda())
+                        input[k] = Variable(torch.stack(input[k]).cuda())
 
-            data = superglue(pred)  # originally not .float()
-            for k, v in pred.items():
-                pred[k] = v[0]
-            pred = {**pred, **data}
+            output = superglue(input)  # originally not .float()
+            for k, v in input.items():
+                input[k] = v[0]
+            input = {**input, **output}
 
-            if pred["skip_train"] == True:  # image has no keypoint
+            if input["skip_train"] == True:  # image has no keypoint
                 continue
 
             # process loss
-            Loss = pred["loss"]
+            Loss = output["loss"]
 
             # print('Loss', Loss)
             # exit()
@@ -288,7 +304,8 @@ if __name__ == "__main__":
             optimizer.step()
 
             # for every 50 images, print progress and visualize the matches
-            if (i + 1) % 5 == 0:
+            if (i + 1 - last_plot_id) > (int)(num_iters * 0.1):
+                last_plot_id = i + 1
                 print(
                     "Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}".format(
                         epoch,
@@ -304,16 +321,18 @@ if __name__ == "__main__":
                 # Visualize the matches.
                 superglue.eval()
                 image0, image1 = (
-                    pred["image0"].cpu().numpy()[0] * 255.0,
-                    pred["image1"].cpu().numpy()[0] * 255.0,
+                    input["image0"].cpu().numpy()[0] * 255.0,
+                    input["image1"].cpu().numpy()[0] * 255.0,
                 )
+
+                # import pdb; pdb.set_trace()
                 kpts0, kpts1 = (
-                    pred["keypoints0"].cpu().numpy()[0],
-                    pred["keypoints1"].cpu().numpy()[0],
+                    input["keypoints0"].cpu().numpy(),
+                    input["keypoints1"].cpu().numpy(),
                 )
                 matches, conf = (
-                    pred["matches0"].cpu().detach().numpy(),
-                    pred["matching_scores0"].cpu().detach().numpy(),
+                    input["matches0"][0].cpu().detach().numpy(),
+                    input["matching_scores0"][0].cpu().detach().numpy(),
                 )
                 image0 = read_image_modified(image0, opt.resize, opt.resize_float)
                 image1 = read_image_modified(image1, opt.resize, opt.resize_float)
@@ -325,7 +344,7 @@ if __name__ == "__main__":
                     str(i), opt.viz_extension
                 )
                 color = cm.jet(mconf)
-                stem = pred["file_name"]
+                stem = input["file_name"]
                 text = []
 
                 make_matching_plot(
@@ -359,7 +378,9 @@ if __name__ == "__main__":
         # save checkpoint when an epoch finishes
         epoch_loss /= len(train_loader)
         model_out_path = f"ckpt/{opt.model}/model_epoch_{epoch}.pth"
-        Path(f"ckpt/{opt.model}").mkdir(parents=True, exist_ok=True)
+        Path(
+            f"ckpt/{opt.model}-{opt.gnn_layers}x{opt.graph}-{opt.edge_pool==None}"
+        ).mkdir(parents=True, exist_ok=True)
         torch.save(superglue, model_out_path)
         print(
             "Epoch [{}/{}] done. Epoch Loss {}. Checkpoint saved to {}".format(

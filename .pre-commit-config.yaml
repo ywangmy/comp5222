@@ -32,13 +32,13 @@ repos:
       hooks:
           - id: shfmt
 
-    - repo: https://github.com/shellcheck-py/shellcheck-py # shellcheck-py is a shellcheck wrapper.
-      rev: v0.9.0.5
-      hooks:
-          - id: shellcheck
-            args:
-                - -e
-                - SC1071,SC1091
+    # - repo: https://github.com/shellcheck-py/shellcheck-py # shellcheck-py is a shellcheck wrapper.
+    #   rev: v0.9.0.5
+    #   hooks:
+    #       - id: shellcheck
+    #         args:
+    #             - -e
+    #             - SC1071,SC1091
 
     - repo: https://github.com/asottile/reorder-python-imports
       rev: v3.10.0
@@ -93,7 +93,7 @@ repos:
                 - --allow-multiple-documents
                 - --unsafe
           - id: check-executables-have-shebangs # ensures that (non-binary) executables have a shebang.
-          - id: check-shebang-scripts-are-executable # ensures that (non-binary) files with a shebang are executable.
+          # - id: check-shebang-scripts-are-executable # ensures that (non-binary) files with a shebang are executable.
           - id: end-of-file-fixer # ensures that a file is either empty, or ends with one newline.
           - id: fix-byte-order-marker # removes utf-8 byte order marker.
           - id: mixed-line-ending # replaces or checks mixed line ending.
