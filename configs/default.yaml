@@ -9,13 +9,15 @@ train:
         COCO:
             path: ./COCO2014/train2014
             fraction: 0.001
-            resize: [640, 480] # Resize the input image before running inference. If two numbers, resize to the exact dimensions, if one number, resize the max dimension, if -1, do not resize
+            resize: [640, 480] # [width, height] Resize the input image before running inference. Comment out if you don't want to resize
+            fix_warp: false
             shuffle: true
 
         ScanNet:
             path: ./ScanNet/train
             fraction: 0.001
-            resize: [640, 480] # Resize the input image before running inference. If two numbers, resize to the exact dimensions, if one number, resize the max dimension, if -1, do not resize
+            resize: [640, 480] # [width, height] Resize the input image before running inference. Comment out if you don't want to resize
+            fix_warp: false
             shuffle: true
 
 eval:
@@ -27,13 +29,15 @@ eval:
         COCO:
             path: ./COCO2014/eval2014
             fraction: 0.001
-            resize: [640, 480] # Resize the input image before running inference. If two numbers, resize to the exact dimensions, if one number, resize the max dimension, if -1, do not resize
+            resize: [640, 480] # [width, height] Resize the input image before running inference. Comment out if you don't want to resize
+            fix_warp: true
             shuffle: true
 
         ScanNet:
             path: ./ScanNet/eval
             fraction: 0.001
-            resize: [640, 480] # Resize the input image before running inference. If two numbers, resize to the exact dimensions, if one number, resize the max dimension, if -1, do not resize
+            resize: [640, 480] # [width, height] Resize the input image before running inference. Comment out if you don't want to resize
+            fix_warp: true
             shuffle: true
 
 superglue:
@@ -48,18 +52,23 @@ feature_extraction:
 
     extractor:
         SIFT:
-            contrastThreshold: 0.04
-            edgeThreshold: 10
+            contrast_threshold: 0.04
+            edge_threshold: 10
             sigma: 1.6
 
-        superpoint:
-            keypoint_threshold: 0.005 # SuperPoint keypoint detector confidence threshold
-            nms_radius: 4 # SuperPoint Non Maximum Suppression (NMS) radius
-            match_threshold: 0.2 # SuperGlue match threshold
-            remove_borders: 4
-            model_path: ./superpoint_v1.pth
+        # superpoint:
+        #     keypoint_threshold: 0.005 # SuperPoint keypoint detector confidence threshold
+        #     nms_radius: 4 # SuperPoint Non Maximum Suppression (NMS) radius
+        #     match_threshold: 0.2 # SuperGlue match threshold
+        #     remove_borders: 4
+        #     model_path: ./superpoint_v1.pth
 
+perspective_warper:
+    homography:
+        perturbation_threshold: 0.2 # Perturbation threshold for homography matrix
 
+    # nerf:
+    #     novel_view_max_angle: 60 # Maximum angle (in degrees) between the new and old camera direction
 
 visualize: true # Visualize the matches and dump the plots
-visualize_output_dir: ./dump_match_pairs/   # Output directory for the visualization
+visualize_output_dir: ./dump_match_pairs/ # Output directory for the visualization
