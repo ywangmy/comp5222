@@ -12,7 +12,8 @@
 1. Run training
 
    ```Shell
-   ./scripts/train.py
+   cd scripts
+   ./train_<model>.sh
    ```
 
 Ori:

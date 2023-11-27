@@ -66,131 +66,7 @@ from models.utils import scale_intrinsics
 torch.set_grad_enabled(False)
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Image pair matching and pose evaluation with SuperGlue",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    )
-
-    parser.add_argument(
-        "--viz", action="store_true", help="Visualize the matches and dump the plots"
-    )
-    parser.add_argument(
-        "--eval",
-        action="store_true",
-        help="Perform the evaluation" " (requires ground truth pose and intrinsics)",
-    )
-
-    parser.add_argument(
-        "--superglue",
-        choices={"indoor", "outdoor"},
-        default="indoor",
-        help="SuperGlue weights",
-    )
-    parser.add_argument(
-        "--max_keypoints",
-        type=int,
-        default=1024,
-        help="Maximum number of keypoints detected by Superpoint"
-        " ('-1' keeps all keypoints)",
-    )
-    parser.add_argument(
-        "--keypoint_threshold",
-        type=float,
-        default=0.005,
-        help="SuperPoint keypoint detector confidence threshold",
-    )
-    parser.add_argument(
-        "--nms_radius",
-        type=int,
-        default=4,
-        help="SuperPoint Non Maximum Suppression (NMS) radius" " (Must be positive)",
-    )
-    parser.add_argument(
-        "--sinkhorn_iterations",
-        type=int,
-        default=20,
-        help="Number of Sinkhorn iterations performed by SuperGlue",
-    )
-    parser.add_argument(
-        "--match_threshold", type=float, default=0.2, help="SuperGlue match threshold"
-    )
-
-    parser.add_argument(
-        "--resize",
-        type=int,
-        nargs="+",
-        default=[640, 480],
-        help="Resize the input image before running inference. If two numbers, "
-        "resize to the exact dimensions, if one number, resize the max "
-        "dimension, if -1, do not resize",
-    )
-    parser.add_argument(
-        "--resize_float",
-        action="store_true",
-        help="Resize the image after casting uint8 to float",
-    )
-
-    parser.add_argument(
-        "--cache",
-        action="store_true",
-        help="Skip the pair if output .npz files are already found",
-    )
-    parser.add_argument(
-        "--show_keypoints",
-        action="store_true",
-        help="Plot the keypoints in addition to the matches",
-    )
-    parser.add_argument(
-        "--fast_viz",
-        action="store_true",
-        help="Use faster image visualization based on OpenCV instead of Matplotlib",
-    )
-    parser.add_argument(
-        "--viz_extension",
-        type=str,
-        default="png",
-        choices=["png", "pdf"],
-        help="Visualization file extension. Use pdf for highest-quality.",
-    )
-
-    parser.add_argument(
-        "--opencv_display",
-        action="store_true",
-        help="Visualize via OpenCV before saving output images",
-    )
-    parser.add_argument(
-        "--pairs_list",
-        type=str,
-        default="assets/scannet_sample_pairs_with_gt.txt",
-        help="Path to the list of image pairs",
-    )
-    parser.add_argument(
-        "--shuffle",
-        action="store_true",
-        help="Shuffle ordering of pairs before processing",
-    )
-    parser.add_argument(
-        "--max_length", type=int, default=-1, help="Maximum number of pairs to evaluate"
-    )
-
-    parser.add_argument(
-        "--data_dir",
-        type=str,
-        default="assets/scannet_sample_images/",
-        help="Path to the directory that contains the images",
-    )
-    parser.add_argument(
-        "--results_dir",
-        type=str,
-        default="dump_match_pairs/",
-        help="Path to the directory in which the .npz results and optional,"
-        "visualizations are written",
-    )
-
-    opt = parser.parse_args()
-    print(opt)
-
+def test(opt):
     assert not (
         opt.opencv_display and not opt.viz
     ), "Must use --viz with --opencv_display"
@@ -249,7 +125,10 @@ if __name__ == "__main__":
     # Create the output directories if they do not exist already.
     data_dir = Path(opt.data_dir)
     print('Looking for data in directory "{}"'.format(data_dir))
-    results_dir = Path(opt.results_dir)
+    results_dir = (
+        Path(opt.results_dir)
+        / f"<eval>{opt.model}-({opt.fraction}|{opt.learning_rate}-{opt.batch_size})-{opt.match_threshold}-{opt.max_keypoints}-{opt.gnn_layers}x{opt.graph}-{opt.edge_pool==None}"
+    )
     results_dir.mkdir(exist_ok=True, parents=True)
     print('Will write matches to directory "{}"'.format(results_dir))
     if opt.eval:

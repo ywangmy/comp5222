@@ -58,8 +58,8 @@ def MLP(channels: list, do_bn=True):
         layers.append(nn.Conv1d(channels[i - 1], channels[i], kernel_size=1, bias=True))
         if i < (n - 1):
             if do_bn:
-                # layers.append(nn.BatchNorm1d(channels[i]))
-                layers.append(nn.InstanceNorm1d(channels[i]))
+                layers.append(nn.BatchNorm1d(channels[i]))
+                # layers.append(nn.InstanceNorm1d(channels[i]))
             layers.append(nn.ReLU())
     return nn.Sequential(*layers)
 
@@ -683,6 +683,7 @@ class SuperGlue(nn.Module):
         # 'GNN_layers': ['self', 'cross'] * 9,
         # 'sinkhorn_iterations': 100,
         # 'match_threshold': 0.2,
+        "load_ckpt": None,
     }
 
     def __init__(self, config):
@@ -751,12 +752,12 @@ class SuperGlue(nn.Module):
         bin_score = torch.nn.Parameter(torch.tensor(1.0))
         self.register_parameter("bin_score", bin_score)
 
-        # assert self.config['weights'] in ['indoor', 'outdoor']
-        # path = Path(__file__).parent
-        # path = path / 'weights/superglue_{}.pth'.format(self.config['weights'])
-        # self.load_state_dict(torch.load(path))
-        # print('Loaded SuperGlue model (\"{}\" weights)'.format(
-        #     self.config['weights']))
+        if self.config["load_ckpt"] != None:
+            # assert self.config['weights'] in ['indoor', 'outdoor']
+            path = Path(__file__).parent.parent
+            path = path / f'ckpt/{self.config["load_ckpt"]}'
+            self.load_state_dict(torch.load(path))
+            print(f"Loaded SuperGlue model ({path})")
 
     def forward(self, data):
         """Run SuperGlue on a pair of keypoints and descriptors"""

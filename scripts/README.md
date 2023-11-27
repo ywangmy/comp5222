@@ -73,7 +73,7 @@ wget http://images.cocodataset.org/zips/test2014.zip
 To train the SuperGlue with default parameters, run the following command:
 
 ```sh
-python train.py
+python main.py --mode='train'
 ```
 
 ### Additional useful command line parameters
