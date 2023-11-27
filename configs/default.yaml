@@ -47,7 +47,7 @@ superglue:
     descriptor_dim: 256 # Dimension of the descriptor
 
 feature_extraction:
-    max_keypoints: 64 # Maximum number of keypoints
+    max_keypoints: 10 # Maximum number of keypoints
     descriptor_dim: 256 # Dimension of the descriptor
 
     extractor:
@@ -64,7 +64,7 @@ feature_extraction:
             model_weight_path: ./models/weights/superpoint_v1.pth
 
 perspective_warper:
-    max_warp_match_pixel_distance: 10 # Maximum pixel distance between the matches to be considered for homography estimation
+    max_warp_match_pixel_distance: 50 # Maximum pixel distance between the matches to be considered for homography estimation
 
     homography:
         perturbation_threshold: 0.2 # (0, 1.0] Perturbation threshold for homography matrix
