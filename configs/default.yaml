@@ -1,11 +1,11 @@
 %YAML 1.2
 ---
 train:
-    batch_size: 32
     epochs: 10
     learning_rate: 0.0001
 
     dataset:
+        batch_size: 32
         COCO:
             path: ./COCO2014/train2014
             fraction: 0.001
@@ -22,10 +22,10 @@ train:
 
 eval:
     output_dir: ./dump_match_pairs/
-    batch_size: 32
     eval_interval: 5 # evaluate 1 epoch every "eval_interval" training epochs
 
     dataset:
+        batch_size: 32
         COCO:
             path: ./COCO2014/eval2014
             fraction: 0.001
@@ -51,21 +51,23 @@ feature_extraction:
     descriptor_dim: 256 # Dimension of the descriptor
 
     extractor:
-        SIFT:
-            contrast_threshold: 0.04
-            edge_threshold: 10
-            sigma: 1.6
+        # SIFT:
+        #     contrast_threshold: 0.04
+        #     edge_threshold: 10
+        #     sigma: 1.6
 
-        # superpoint:
-        #     keypoint_threshold: 0.005 # SuperPoint keypoint detector confidence threshold
-        #     nms_radius: 4 # SuperPoint Non Maximum Suppression (NMS) radius
-        #     match_threshold: 0.2 # SuperGlue match threshold
-        #     remove_borders: 4
-        #     model_path: ./superpoint_v1.pth
+        superpoint:
+            keypoint_threshold: 0.005 # SuperPoint keypoint detector confidence threshold
+            nms_radius: 4 # SuperPoint Non Maximum Suppression (NMS) radius
+            match_threshold: 0.2 # SuperGlue match threshold
+            remove_borders: 4
+            model_weight_path: ./models/weights/superpoint_v1.pth
 
 perspective_warper:
+    max_warp_match_pixel_distance: 10 # Maximum pixel distance between the matches to be considered for homography estimation
+
     homography:
-        perturbation_threshold: 0.2 # Perturbation threshold for homography matrix
+        perturbation_threshold: 0.2 # (0, 1.0] Perturbation threshold for homography matrix
 
     # nerf:
     #     novel_view_max_angle: 60 # Maximum angle (in degrees) between the new and old camera direction
