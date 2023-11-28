@@ -58,6 +58,7 @@ class HomographyWarper(PerspectiveWarper):
         self.perturbation_threshold = float(
             config["homography"]["perturbation_threshold"]
         )
+        self.random_rotation = bool(config["homography"]["random_rotation"])
 
     def generate_transform(self, width, height):
         corners = np.float32([[0, 0], [0, height], [width, 0], [width, height]])
@@ -77,6 +78,19 @@ class HomographyWarper(PerspectiveWarper):
 
         new_corners = corners + warp
         transform = cv2.getPerspectiveTransform(corners, new_corners)
+
+        # Randomly decide whether to apply rotation
+        if self.random_rotation:
+            # Generate a random angle between -180 and 180 degrees
+            angle = np.random.uniform(-180, 180)
+            center = (width / 2, height / 2)
+            rotation_matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
+
+            # Convert rotation matrix to 3x3 homography matrix
+            rotation_transform = np.vstack([rotation_matrix, [0, 0, 1]])
+
+            # Combine homography and rotation transformations
+            transform = rotation_transform @ transform
 
         return [transform, (width, height)]
 

@@ -8,10 +8,10 @@ import matplotlib.cm as cm
 import numpy as np
 import torch.multiprocessing
 import torch.nn as nn
+import wandb
 from torch.autograd import Variable
 from tqdm import tqdm
 
-import wandb
 from load_data import SparseDataset
 from models.matchingForTraining import MatchingForTraining
 from models.superglue import SuperGlue

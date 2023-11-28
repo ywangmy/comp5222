@@ -75,6 +75,10 @@ class SiftExtractor(FeatureExtractor):
 
     def __call__(self, image):
         keypoints, descriptors = self.sift.detectAndCompute(image, None)
+        keypoints, descriptors = (
+            keypoints[: self.max_keypoints],
+            descriptors[: self.max_keypoints],
+        )  # have to cap it since cv2 is dumb sb
         confidence_scores = torch.tensor([k.response for k in keypoints]).unsqueeze(-1)
         keypoints = torch.tensor([(kp.pt[0], kp.pt[1]) for kp in keypoints])
         descriptors = torch.tensor(descriptors)
