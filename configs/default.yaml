@@ -1,0 +1,77 @@
+%YAML 1.2
+---
+train:
+    epochs: 10
+    learning_rate: 0.0001
+
+    dataset:
+        batch_size: 6
+        shuffle: true
+
+        COCO:
+            path: ./COCO2014/train2014
+            fraction: 0.001
+            resize: [640, 480] # [width, height] Resize the input image before running inference. Comment out if you don't want to resize
+            fix_warp: false
+
+        ScanNet:
+            path: ./ScanNet/train
+            fraction: 0.001
+            resize: [640, 480] # [width, height] Resize the input image before running inference. Comment out if you don't want to resize
+            fix_warp: false
+
+eval:
+    output_dir: ./dump_match_pairs/
+    eval_interval: 5 # evaluate 1 epoch every "eval_interval" training epochs
+
+    dataset:
+        batch_size: 32
+        shuffle: false
+
+        COCO:
+            path: ./COCO2014/eval2014
+            fraction: 0.001
+            resize: [640, 480] # [width, height] Resize the input image before running inference. Comment out if you don't want to resize
+            fix_warp: true
+
+        ScanNet:
+            path: ./ScanNet/eval
+            fraction: 0.001
+            resize: [640, 480] # [width, height] Resize the input image before running inference. Comment out if you don't want to resize
+            fix_warp: true
+
+feature_extraction:
+    max_keypoints: 64 # Maximum number of keypoints
+    descriptor_dim: 256 # Dimension of the descriptor
+
+    extractor:
+        # SIFT:
+        #     contrast_threshold: 0.04
+        #     edge_threshold: 10
+        #     sigma: 1.6
+
+        Superpoint:
+            keypoint_threshold: 0.005 # SuperPoint keypoint detector confidence threshold
+            nms_radius: 4 # SuperPoint Non Maximum Suppression (NMS) radius
+            match_threshold: 0.2 # SuperGlue match threshold
+            remove_borders: 4
+            model_weight_path: ./models/weights/superpoint_v1.pth
+
+perspective_warper:
+    max_warp_match_pixel_distance: 2 # Maximum pixel distance between the matches to be considered for homography estimation
+
+    homography:
+        perturbation_threshold: 0.25 # (0, 1.0] Perturbation threshold for homography matrix
+        random_rotation: true
+
+    # nerf:
+    #     novel_view_max_angle: 60 # Maximum angle (in degrees) between the new and old camera direction
+
+superglue:
+    num_layers: 3
+    sinkhorn_iterations: 10
+    match_threshold: 0.2
+    descriptor_dim: 256 # Dimension of the descriptor
+
+visualize: true # Visualize the matches and dump the plots
+visualize_output_dir: ./dump_match_pairs/ # Output directory for the visualization
