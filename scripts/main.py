@@ -110,7 +110,7 @@ def get_args():
         help="Visualize via OpenCV before saving output images",
     )
     parser.add_argument(
-        "--pairs_list",
+        "--input_pairs",
         type=str,
         default="assets/scannet_sample_pairs_with_gt.txt",
         help="Path to the list of image pairs for evaluation",
@@ -125,13 +125,13 @@ def get_args():
     )
 
     parser.add_argument(
-        "--data_dir",
+        "--input_dir",
         type=str,
         default="assets/scannet_sample_images/",
         help="Path to the directory that contains the images",
     )
     parser.add_argument(
-        "--results_dir",
+        "--output_dir",
         type=str,
         default="dump_match_pairs/",
         help="Path to the directory in which the .npz results and optional,"
@@ -149,7 +149,7 @@ def get_args():
         default="./COCO2014/train2014/",
         help="Path to the directory of training imgs.",
     )
-    parser.add_argument("--epoch", type=int, default=100, help="Number of epoches")
+    parser.add_argument("--num_epochs", type=int, default=100, help="Number of epoches")
 
     parser.add_argument("--descriptor_dim", type=int, default=128)
 
@@ -159,13 +159,33 @@ def get_args():
     parser.add_argument("--gnn_layers", type=int, default=3)
     parser.add_argument("--graph", type=int, default=2)
     parser.add_argument("--edge_pool", type=list, default=None)
+    parser.add_argument("--epoch", type=int, default=None)
 
     opt = parser.parse_args()
     return opt
 
 
-def model_str(opt):
+def get_model_str(opt):
     return f"{opt.model}-({opt.fraction}|{opt.learning_rate}-{opt.batch_size})-{opt.match_threshold}-{opt.max_keypoints}-{opt.gnn_layers}x{opt.graph}-{opt.edge_pool==None}"
+
+
+def get_model_ckpt_path(opt, epoch):
+    return Path("ckpt") / f"{get_model_str(opt)}/model_epoch_{epoch}.pth"
+
+
+def get_superglue_config(opt, epoch=None):
+    return {
+        "model": opt.model,
+        "load_ckpt": None if epoch == None else get_model_ckpt_path(opt, epoch),
+        "sinkhorn_iterations": opt.sinkhorn_iterations,
+        "match_threshold": opt.match_threshold,
+        "descriptor_dim": 128,
+        "weights": "indoor",
+        "keypoint_encoder": [32, 64, 128],
+        "GNN_layers": (["self", "cross"] if opt.graph == 2 else ["union"])
+        * opt.gnn_layers,
+        "sinkhorn_iterations": 100,
+    }
 
 
 def main():
@@ -173,11 +193,15 @@ def main():
     if opt.mode == "train":
         from train import train
 
-        train(opt)
+        train(opt, get_superglue_config(opt), get_model_str)
     elif opt.mode == "test":
         from match_pairs import test
 
-        test(opt)
+        test(
+            opt,
+            get_superglue_config(opt, opt.epoch),
+            get_model_ckpt_path(opt, opt.epoch),
+        )
 
 
 if __name__ == "__main__":

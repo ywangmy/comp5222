@@ -755,7 +755,8 @@ class SuperGlue(nn.Module):
         if self.config["load_ckpt"] != None:
             # assert self.config['weights'] in ['indoor', 'outdoor']
             path = Path(__file__).parent.parent
-            path = path / f'ckpt/{self.config["load_ckpt"]}'
+            path = path / f'{self.config["load_ckpt"]}'
+            print(torch.load(path))
             self.load_state_dict(torch.load(path))
             print(f"Loaded SuperGlue model ({path})")
 

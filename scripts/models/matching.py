@@ -42,8 +42,8 @@
 # %BANNER_END%
 import torch
 
+from .sift import SIFT
 from .superglue import SuperGlue
-from .superpoint import SuperPoint
 
 
 class Matching(torch.nn.Module):
@@ -51,8 +51,17 @@ class Matching(torch.nn.Module):
 
     def __init__(self, config={}):
         super().__init__()
-        self.superpoint = SuperPoint(config.get("superpoint", {}))
-        self.superglue = SuperGlue(config.get("superglue", {}))
+        print(config)
+        # self.extractor = SuperPoint(config.get("superpoint", {}))
+
+        from pathlib import Path
+
+        path = Path(__file__).parent.parent
+        path = path / f'{config["superglue"]["load_ckpt"]}'
+        print(torch.load(path))
+        self.superglue = torch.load(path)
+        print(f"Loaded SuperGlue model ({path})")
+        # self.superglue = SuperGlue(config.get("superglue", {}))
 
     def forward(self, data):
         """Run SuperPoint (optionally) and SuperGlue
@@ -64,10 +73,10 @@ class Matching(torch.nn.Module):
 
         # Extract SuperPoint (keypoints, scores, descriptors) if not provided
         if "keypoints0" not in data:
-            pred0 = self.superpoint({"image": data["image0"]})
+            pred0 = self.extractor({"image": data["image0"]})
             pred = {**pred, **{k + "0": v for k, v in pred0.items()}}
         if "keypoints1" not in data:
-            pred1 = self.superpoint({"image": data["image1"]})
+            pred1 = self.extractor({"image": data["image1"]})
             pred = {**pred, **{k + "1": v for k, v in pred1.items()}}
 
         # Batch all features

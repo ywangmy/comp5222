@@ -66,7 +66,7 @@ from models.utils import scale_intrinsics
 torch.set_grad_enabled(False)
 
 
-def test(opt):
+def test(opt, superglue_config, model_ckpt_path):
     assert not (
         opt.opencv_display and not opt.viz
     ), "Must use --viz with --opencv_display"
@@ -89,7 +89,7 @@ def test(opt):
     else:
         raise ValueError("Cannot specify more than two integers for --resize")
 
-    with open(opt.pairs_list, "r") as f:
+    with open(opt.input_pairs, "r") as f:
         pairs = [l.split() for l in f.readlines()]
 
     if opt.max_length > -1:
@@ -102,7 +102,7 @@ def test(opt):
         if not all([len(p) == 38 for p in pairs]):
             raise ValueError(
                 "All pairs should have ground truth info for evaluation."
-                'File "{}" needs 38 valid entries per row'.format(opt.pairs_list)
+                'File "{}" needs 38 valid entries per row'.format(opt.input_pairs)
             )
 
     # Load the SuperPoint and SuperGlue models.
@@ -114,40 +114,34 @@ def test(opt):
             "keypoint_threshold": opt.keypoint_threshold,
             "max_keypoints": opt.max_keypoints,
         },
-        "superglue": {
-            "weights": opt.superglue,
-            "sinkhorn_iterations": opt.sinkhorn_iterations,
-            "match_threshold": opt.match_threshold,
-        },
+        "superglue": superglue_config,
     }
     matching = Matching(config).eval().to(device)
 
     # Create the output directories if they do not exist already.
-    data_dir = Path(opt.data_dir)
-    print('Looking for data in directory "{}"'.format(data_dir))
-    results_dir = (
-        Path(opt.results_dir)
+    input_dir = Path(opt.input_dir)
+    print('Looking for data in directory "{}"'.format(input_dir))
+    output_dir = (
+        Path(opt.output_dir)
         / f"<eval>{opt.model}-({opt.fraction}|{opt.learning_rate}-{opt.batch_size})-{opt.match_threshold}-{opt.max_keypoints}-{opt.gnn_layers}x{opt.graph}-{opt.edge_pool==None}"
     )
-    results_dir.mkdir(exist_ok=True, parents=True)
-    print('Will write matches to directory "{}"'.format(results_dir))
+    output_dir.mkdir(exist_ok=True, parents=True)
+    print('Will write matches to directory "{}"'.format(output_dir))
     if opt.eval:
-        print("Will write evaluation results", 'to directory "{}"'.format(results_dir))
+        print("Will write evaluation results", 'to directory "{}"'.format(output_dir))
     if opt.viz:
-        print(
-            "Will write visualization images to", 'directory "{}"'.format(results_dir)
-        )
+        print("Will write visualization images to", 'directory "{}"'.format(output_dir))
 
     timer = AverageTimer(newline=True)
     for i, pair in enumerate(pairs):
         name0, name1 = pair[:2]
         stem0, stem1 = Path(name0).stem, Path(name1).stem
-        matches_path = results_dir / "{}_{}_matches.npz".format(stem0, stem1)
-        eval_path = results_dir / "{}_{}_evaluation.npz".format(stem0, stem1)
-        viz_path = results_dir / "{}_{}_matches.{}".format(
+        matches_path = output_dir / "{}_{}_matches.npz".format(stem0, stem1)
+        eval_path = output_dir / "{}_{}_evaluation.npz".format(stem0, stem1)
+        viz_path = output_dir / "{}_{}_matches.{}".format(
             stem0, stem1, opt.viz_extension
         )
-        viz_eval_path = results_dir / "{}_{}_evaluation.{}".format(
+        viz_eval_path = output_dir / "{}_{}_evaluation.{}".format(
             stem0, stem1, opt.viz_extension
         )
 
@@ -195,15 +189,23 @@ def test(opt):
 
         # Load the image pair.
         image0, inp0, scales0 = read_image(
-            data_dir / name0, device, opt.resize, rot0, opt.resize_float
+            input_dir / name0,
+            # device,
+            opt.resize,
+            rot0,
+            opt.resize_float,
         )
         image1, inp1, scales1 = read_image(
-            data_dir / name1, device, opt.resize, rot1, opt.resize_float
+            input_dir / name1,
+            # device,
+            opt.resize,
+            rot1,
+            opt.resize_float,
         )
         if image0 is None or image1 is None:
             print(
                 "Problem reading image pair: {} {}".format(
-                    data_dir / name0, data_dir / name1
+                    input_dir / name0, input_dir / name1
                 )
             )
             exit(1)
@@ -361,7 +363,7 @@ def test(opt):
         for pair in pairs:
             name0, name1 = pair[:2]
             stem0, stem1 = Path(name0).stem, Path(name1).stem
-            eval_path = results_dir / "{}_{}_evaluation.npz".format(stem0, stem1)
+            eval_path = output_dir / "{}_{}_evaluation.npz".format(stem0, stem1)
             results = np.load(eval_path)
             pose_error = np.maximum(results["error_t"], results["error_R"])
             pose_errors.append(pose_error)

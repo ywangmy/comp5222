@@ -28,11 +28,7 @@ from tqdm import tqdm
 # from models.matchingForTraining import MatchingForTraining
 
 
-def model_str(opt):
-    return f"{opt.model}-({opt.fraction}|{opt.learning_rate}-{opt.batch_size})-{opt.match_threshold}-{opt.max_keypoints}-{opt.gnn_layers}x{opt.graph}-{opt.edge_pool==None}"
-
-
-def train(opt):
+def train(opt, superglue_config, get_model_str_func):
     torch.set_grad_enabled(True)
     torch.multiprocessing.set_sharing_strategy("file_system")
 
@@ -62,24 +58,13 @@ def train(opt):
             "max_keypoints": -1,
             "remove_borders": 4,
         },
-        "superglue": {
-            "model": opt.model,
-            "weights": opt.superglue,
-            "sinkhorn_iterations": opt.sinkhorn_iterations,
-            "match_threshold": opt.match_threshold,
-            "descriptor_dim": 128,
-            "weights": "indoor",
-            "keypoint_encoder": [32, 64, 128],
-            "GNN_layers": (["self", "cross"] if opt.graph == 2 else ["union"])
-            * opt.gnn_layers,
-            "sinkhorn_iterations": 100,
-        },
+        "superglue": superglue_config,
     }
 
     # store viz results
-    results_dir = Path(opt.results_dir) / model_str(opt)
-    results_dir.mkdir(exist_ok=True, parents=True)
-    print("Will write visualization images to", 'directory "{}"'.format(results_dir))
+    output_dir = Path(opt.output_dir) / get_model_str_func(opt)
+    output_dir.mkdir(exist_ok=True, parents=True)
+    print("Will write visualization images to", 'directory "{}"'.format(output_dir))
 
     # torch.autograd.set_detect_anomaly(True)
 
@@ -120,7 +105,7 @@ def train(opt):
 
     # start training
 
-    for epoch in range(1, opt.epoch + 1):
+    for epoch in range(1, opt.num_epochs + 1):
         epoch_loss = 0
         # originally double
         superglue.float().train()
@@ -137,9 +122,9 @@ def train(opt):
             output = superglue(input)  # originally not .float()
             for k, v in input.items():
                 input[k] = v[0]
-            input = {**input, **output}
+            # input = {**input, **output}
 
-            if input["skip_train"] == True:  # image has no keypoint
+            if output["skip_train"] == True:  # image has no keypoint
                 continue
 
             # process loss
@@ -164,7 +149,7 @@ def train(opt):
                 print(
                     "Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}".format(
                         epoch,
-                        opt.epoch,
+                        opt.num_epochs,
                         i + 1,
                         len(train_loader),
                         torch.mean(torch.stack(mean_loss)).item(),
@@ -186,8 +171,8 @@ def train(opt):
                     input["keypoints1"].cpu().numpy(),
                 )
                 matches, conf = (
-                    input["matches0"][0].cpu().detach().numpy(),
-                    input["matching_scores0"][0].cpu().detach().numpy(),
+                    output["matches0"][0].cpu().detach().numpy(),
+                    output["matching_scores0"][0].cpu().detach().numpy(),
                 )
                 image0 = read_image_modified(image0, opt.resize, opt.resize_float)
                 image1 = read_image_modified(image1, opt.resize, opt.resize_float)
@@ -195,7 +180,7 @@ def train(opt):
                 mkpts0 = kpts0[valid]
                 mkpts1 = kpts1[matches[valid]]
                 mconf = conf[valid]
-                viz_path = results_dir / "{}_matches.{}".format(
+                viz_path = output_dir / "{}_matches.{}".format(
                     str(i), opt.viz_extension
                 )
                 color = cm.jet(mconf)
@@ -226,18 +211,18 @@ def train(opt):
                 torch.save(superglue, model_out_path)
                 print(
                     "Epoch [{}/{}], Step [{}/{}], Checkpoint saved to {}".format(
-                        epoch, opt.epoch, i + 1, len(train_loader), model_out_path
+                        epoch, opt.num_epochs, i + 1, len(train_loader), model_out_path
                     )
                 )
 
         # save checkpoint when an epoch finishes
         epoch_loss /= len(train_loader)
-        model_out_path = Path("ckpt") / f"{model_str(opt)}/model_epoch_{epoch}.pth"
+        model_out_path = get_model_ckpt_path(opt, epoch)
         model_out_path.parent.mkdir(exist_ok=True, parents=True)
         torch.save(superglue, model_out_path)
         print(
             "Epoch [{}/{}] done. Epoch Loss {}. Checkpoint saved to {}".format(
-                epoch, opt.epoch, epoch_loss, model_out_path
+                epoch, opt.num_epochs, epoch_loss, model_out_path
             )
         )
 

@@ -217,3 +217,5 @@ scripts/*.pth
 scripts/ckpt*
 scripts/scannet_eval.tar.gz
 SGMNet
+
+scripts/yfcc
