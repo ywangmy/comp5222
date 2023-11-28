@@ -7,7 +7,7 @@
 # Copyright Ⓒ 2023 Mukai (Tom Notch) Yu
 #
 from abc import ABC
-from abc import abstractmethod
+from abc import abstractclassmethod
 
 import cv2
 import numpy as np
@@ -35,19 +35,19 @@ class PerspectiveWarper(ABC):
             config["max_warp_match_pixel_distance"]
         )
 
-    @abstractmethod
+    @abstractclassmethod
     def generate_transform(self, width, height):
         pass
 
-    @abstractmethod
+    @abstractclassmethod
     def warp_image_to_novel(self, image, warp_transform):
         pass
 
-    @abstractmethod
+    @abstractclassmethod
     def warp_keypoints_to_novel(self, keypoints, warp_transform):
         pass
 
-    @abstractmethod
+    @abstractclassmethod
     def warp_keypoints_to_original(self, keypoints, warp_transform):
         pass
 

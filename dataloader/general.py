@@ -6,8 +6,38 @@
 #
 # Copyright Ⓒ 2023 Mukai (Tom Notch) Yu
 #
-import cv2
-import numpy as np
-import torch
-from scipy.spatial.distance import cdist
-from torch.utils.data import Dataset
+from torch.utils.data import ConcatDataset
+from torch.utils.data import DataLoader
+
+from .COCO import COCODataset
+from .ScanNet import ScanNetDataset
+
+
+class FeatureMatchingDataLoader(DataLoader):
+    def __init__(self, config, feature_extractor, perspective_warper):
+        self.config = config
+        self.batch_size = int(config["batch_size"])
+        self.shuffle = bool(config["shuffle"])
+
+        self.feature_extractor = feature_extractor
+        self.perspective_warper = perspective_warper
+
+        dataset_list = []
+        if "COCO" in config:
+            dataset_list.append(
+                COCODataset(
+                    config["COCO"], self.feature_extractor, self.perspective_warper
+                )
+            )
+        if "ScanNet" in config:
+            dataset_list.append(
+                ScanNetDataset(
+                    config["ScanNet"], self.feature_extractor, self.perspective_warper
+                )
+            )
+
+        super().__init__(
+            ConcatDataset(dataset_list),
+            self.batch_size,
+            shuffle=self.shuffle,
+        )

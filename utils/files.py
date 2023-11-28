@@ -110,13 +110,16 @@ def get_item(node: cv2.FileNode, yaml_base_path: str):
     elif node.isReal() or node.isInt():  # number
         return node.real()
     elif node.isString():  # string
-        path = parse_path(
-            node.string(), yaml_base_path
-        )  # try parsing the string as path
+        value = node.string()
+        path = parse_path(value, yaml_base_path)  # try parsing the string as path
         if path:
             return read_file(path)
+        elif value == "false" or value == "False":
+            return False
+        elif value == "true" or value == "True":
+            return True
         else:  # not a path
-            return node.string()
+            return value
 
 
 def read_file(path: str):

@@ -9,7 +9,7 @@
 import os
 import sys
 from abc import ABC
-from abc import abstractmethod
+from abc import abstractclassmethod
 
 import cv2
 import numpy as np
@@ -25,7 +25,9 @@ from models.superpoint import SuperPoint
 
 
 class FeatureExtractor(ABC):
-    def __new__(cls, config):
+    def __new__(
+        cls, config, device=torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    ):
         # Use __new__ to create an instance of the appropriate subclass
         extractor_config = config["extractor"]
         if extractor_config is None:
@@ -33,7 +35,7 @@ class FeatureExtractor(ABC):
 
         if "SIFT" in extractor_config:
             return super(FeatureExtractor, cls).__new__(SiftExtractor)
-        elif "superpoint" in extractor_config:
+        elif "Superpoint" in extractor_config:
             return super(FeatureExtractor, cls).__new__(SuperpointExtractor)
         else:
             raise ValueError(
@@ -42,14 +44,20 @@ class FeatureExtractor(ABC):
                 + " in config"
             )
 
-    def __init__(self, config):
+    def __init__(
+        self,
+        config,
+        device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+    ):
         # This will only be called if a subclass instance is not created in __new__
         # Initialize shared configuration parameters
         self.config = config
         self.max_keypoints = int(config["max_keypoints"])
         self.descriptor_dim = int(config["descriptor_dim"])
 
-    @abstractmethod
+        self.device = device
+
+    @abstractclassmethod
     def __call__(self, image):
         # This will be called when the instance is called like a function, e.g.
         # feature_extractor = FeatureExtractor(config["feature_extraction"])
@@ -58,7 +66,11 @@ class FeatureExtractor(ABC):
 
 
 class SiftExtractor(FeatureExtractor):
-    def __init__(self, config):
+    def __init__(
+        self,
+        config,
+        device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+    ):
         super().__init__(config)
         self.contrast_threshold = float(
             config["extractor"]["SIFT"]["contrast_threshold"]
@@ -86,26 +98,29 @@ class SiftExtractor(FeatureExtractor):
 
 
 class SuperpointExtractor(FeatureExtractor):
-    def __init__(self, config):
+    def __init__(
+        self,
+        config,
+        device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+    ):
         super().__init__(config)
-        self.superpoint_config = config["extractor"]["superpoint"]
+        self.superpoint_config = config["extractor"]["Superpoint"]
         self.superpoint_config["max_keypoints"] = self.max_keypoints
         self.superpoint_config["descriptor_dim"] = self.descriptor_dim
         self.superpoint_config["nms_radius"] = int(self.superpoint_config["nms_radius"])
 
-        self.superpoint = SuperPoint(self.superpoint_config).eval()
-        self.superpoint.load_state_dict(
-            torch.load(self.superpoint_config["model_weight_path"])
-        )
+        self.superpoint = SuperPoint(self.superpoint_config).eval().to(self.device)
 
     def __call__(self, image):
         # Convert the input image to a torch tensor
-        input_tensor = torch.from_numpy(image / 255.0).float()[None, None]
+        input_tensor = (
+            torch.from_numpy(image / 255.0).float()[None, None].to(self.device)
+        )
 
         # Pass the image through the SuperPoint model
         result = self.superpoint({"image": input_tensor})
         return (
-            result["keypoints"][0],
-            result["descriptors"][0].T,
-            result["scores"][0][:, np.newaxis],
+            result["keypoints"][0].to("cpu"),
+            result["descriptors"][0].T.to("cpu"),
+            result["scores"][0][:, np.newaxis].to("cpu"),
         )
