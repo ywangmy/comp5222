@@ -69,14 +69,16 @@ torch.set_grad_enabled(False)
 
 def test(opt, superglue_config, model_ckpt_path):
     assert not (
-        opt.opencv_display and not opt.viz
+        config["opencv_display"] and not config["viz"]
     ), "Must use --viz with --opencv_display"
     assert not (
-        opt.opencv_display and not opt.fast_viz
+        config["opencv_display"] and not config["fast_viz"]
     ), "Cannot use --opencv_display without --fast_viz"
-    assert not (opt.fast_viz and not opt.viz), "Must use --viz with --fast_viz"
     assert not (
-        opt.fast_viz and opt.viz_extension == "pdf"
+        config["fast_viz"] and not config["viz"]
+    ), "Must use --viz with --fast_viz"
+    assert not (
+        config["fast_viz"] and config["viz_extension"] == "pdf"
     ), "Cannot use pdf extension with --fast_viz"
 
     if len(opt.resize) == 2 and opt.resize[1] == -1:
@@ -90,20 +92,22 @@ def test(opt, superglue_config, model_ckpt_path):
     else:
         raise ValueError("Cannot specify more than two integers for --resize")
 
-    with open(opt.input_pairs, "r") as f:
+    with open(config["eval"]["input_pairs"], "r") as f:
         pairs = [l.split() for l in f.readlines()]
 
-    if opt.max_length > -1:
-        pairs = pairs[0 : np.min([len(pairs), opt.max_length])]
+    if config["max_length"] > -1:
+        pairs = pairs[0 : np.min([len(pairs), config["max_length"]])]
 
     if opt.shuffle:
         random.Random(0).shuffle(pairs)
 
-    if opt.eval:
+    if config["eval"]:
         if not all([len(p) == 38 for p in pairs]):
             raise ValueError(
                 "All pairs should have ground truth info for evaluation."
-                'File "{}" needs 38 valid entries per row'.format(opt.input_pairs)
+                'File "{}" needs 38 valid entries per row'.format(
+                    config["eval"]["input_pairs"]
+                )
             )
 
     # Load the SuperPoint and SuperGlue models.
@@ -113,24 +117,24 @@ def test(opt, superglue_config, model_ckpt_path):
         "superpoint": {
             "nms_radius": opt.nms_radius,
             "keypoint_threshold": opt.keypoint_threshold,
-            "max_keypoints": opt.max_keypoints,
+            "max_keypoints": config["model"]["max_keypoints"],
         },
         "superglue": superglue_config,
     }
     matching = Matching(config).eval().to(device)
 
     # Create the output directories if they do not exist already.
-    input_dir = Path(opt.input_dir)
+    input_dir = Path(config["eval"]["input_dir"])
     print('Looking for data in directory "{}"'.format(input_dir))
     output_dir = (
-        Path(opt.output_dir)
-        / f"<eval>{opt.model}-({opt.fraction}|{opt.learning_rate}-{opt.batch_size})-{opt.match_threshold}-{opt.max_keypoints}-{opt.gnn_layers}x{opt.graph}-{opt.edge_pool==None}"
+        Path(config["train"]["output_dir"])
+        / f"<eval>{config['model']}-({opt.fraction}|{opt.learning_rate}-{config['model']['batch_size']})-{config['model']['match_threshold']}-{opt.max_keypoints}-{config['model']['num_gnn_layers']}x{opt.graph}-{config['model']['edge_pool']==None}"
     )
     output_dir.mkdir(exist_ok=True, parents=True)
     print('Will write matches to directory "{}"'.format(output_dir))
-    if opt.eval:
+    if config["eval"]:
         print("Will write evaluation results", 'to directory "{}"'.format(output_dir))
-    if opt.viz:
+    if config["viz"]:
         print("Will write visualization images to", 'directory "{}"'.format(output_dir))
 
     timer = AverageTimer(newline=True)
@@ -140,18 +144,18 @@ def test(opt, superglue_config, model_ckpt_path):
         matches_path = output_dir / "{}_{}_matches.npz".format(stem0, stem1)
         eval_path = output_dir / "{}_{}_evaluation.npz".format(stem0, stem1)
         viz_path = output_dir / "{}_{}_matches.{}".format(
-            stem0, stem1, opt.viz_extension
+            stem0, stem1, config["viz_extension"]
         )
         viz_eval_path = output_dir / "{}_{}_evaluation.{}".format(
-            stem0, stem1, opt.viz_extension
+            stem0, stem1, config["viz_extension"]
         )
 
         # Handle --cache logic.
         do_match = True
-        do_eval = opt.eval
-        do_viz = opt.viz
-        do_viz_eval = opt.eval and opt.viz
-        if opt.cache:
+        do_eval = config["eval"]
+        do_viz = config["viz"]
+        do_viz_eval = config["eval"] and config["viz"]
+        if config["cache"]:
             if matches_path.exists():
                 try:
                     results = np.load(matches_path)
@@ -161,7 +165,7 @@ def test(opt, superglue_config, model_ckpt_path):
                 kpts0, kpts1 = results["keypoints0"], results["keypoints1"]
                 matches, conf = results["matches"], results["match_confidence"]
                 do_match = False
-            if opt.eval and eval_path.exists():
+            if config["eval"] and eval_path.exists():
                 try:
                     results = np.load(eval_path)
                 except:
@@ -172,9 +176,9 @@ def test(opt, superglue_config, model_ckpt_path):
                 num_correct = results["num_correct"]
                 epi_errs = results["epipolar_errors"]
                 do_eval = False
-            if opt.viz and viz_path.exists():
+            if config["viz"] and viz_path.exists():
                 do_viz = False
-            if opt.viz and opt.eval and viz_eval_path.exists():
+            if config["viz"] and config["eval"] and viz_eval_path.exists():
                 do_viz_eval = False
             timer.update("load_cache")
 
@@ -194,14 +198,14 @@ def test(opt, superglue_config, model_ckpt_path):
             # device,
             opt.resize,
             rot0,
-            opt.resize_float,
+            config["resize_float"],
         )
         image1, inp1, scales1 = read_image(
             input_dir / name1,
             # device,
             opt.resize,
             rot1,
-            opt.resize_float,
+            config["resize_float"],
         )
         if image0 is None or image1 is None:
             print(
@@ -308,9 +312,9 @@ def test(opt, superglue_config, model_ckpt_path):
                 viz_path,
                 stem0,
                 stem1,
-                opt.show_keypoints,
-                opt.fast_viz,
-                opt.opencv_display,
+                config["show_keypoints"],
+                config["fast_viz"],
+                config["opencv_display"],
                 "Matches",
             )
 
@@ -321,7 +325,7 @@ def test(opt, superglue_config, model_ckpt_path):
             color = np.clip((epi_errs - 0) / (1e-3 - 0), 0, 1)
             color = error_colormap(1 - color)
             deg, delta = " deg", "Delta "
-            if not opt.fast_viz:
+            if not config["fast_viz"]:
                 deg, delta = "°", "$\\Delta$"
             e_t = "FAIL" if np.isinf(err_t) else "{:.1f}{}".format(err_t, deg)
             e_R = "FAIL" if np.isinf(err_R) else "{:.1f}{}".format(err_R, deg)
@@ -346,9 +350,9 @@ def test(opt, superglue_config, model_ckpt_path):
                 viz_eval_path,
                 stem0,
                 stem1,
-                opt.show_keypoints,
-                opt.fast_viz,
-                opt.opencv_display,
+                config["show_keypoints"],
+                config["fast_viz"],
+                config["opencv_display"],
                 "Relative Pose",
             )
 
@@ -356,7 +360,7 @@ def test(opt, superglue_config, model_ckpt_path):
 
         timer.print("Finished pair {:5} of {:5}".format(i, len(pairs)))
 
-    if opt.eval:
+    if config["eval"]:
         # Collate the results into a final table and print to terminal.
         pose_errors = []
         precisions = []

@@ -1,0 +1,8 @@
+%YAML 1.2
+---
+descriptor_dim: 128
+model_name: gat
+num_gnn_layers: 9
+graph_type: 2
+edge_pool: None
+batch_size: 12

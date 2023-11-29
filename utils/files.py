@@ -134,8 +134,12 @@ def read_file(path: str):
     if not os.path.exists(path):
         raise FileNotFoundError(f"File {path} does not exist")
     if path.endswith(".yaml") or path.endswith(".yml"):
-        yaml_file = cv2.FileStorage(path, cv2.FILE_STORAGE_READ)
-        return get_item(yaml_file.root(), os.path.dirname(path))
+        import yaml
+
+        with open(path, "r") as f:
+            return yaml.safe_load(f)
+        # yaml_file = cv2.FileStorage(path, cv2.FILE_STORAGE_READ)
+        # return get_item(yaml_file.root(), os.path.dirname(path))
     elif path.endswith(".png") or path.endswith(".jpg") or path.endswith(".jpeg"):
         return cv2.imread(path)
     elif path.endswith(".ts") or path.endswith(".trt"):

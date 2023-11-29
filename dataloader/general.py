@@ -14,7 +14,7 @@ from .ScanNet import ScanNetDataset
 
 
 class FeatureMatchingDataLoader(DataLoader):
-    def __init__(self, config, feature_extractor, perspective_warper):
+    def __init__(self, config, feature_extractor, perspective_warper, drop_last=True):
         self.config = config
         self.batch_size = int(config["batch_size"])
         self.shuffle = bool(config["shuffle"])
@@ -40,4 +40,5 @@ class FeatureMatchingDataLoader(DataLoader):
             ConcatDataset(dataset_list),
             self.batch_size,
             shuffle=self.shuffle,
+            drop_last=drop_last,
         )

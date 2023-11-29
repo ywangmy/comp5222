@@ -215,3 +215,7 @@ pyrightconfig.json
 **/wandb
 **/*.pth
 **/ckpt*
+yfcc
+scripts
+SGMNet
+scannet_eval.tar.gz

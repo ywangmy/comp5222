@@ -204,13 +204,15 @@ class ScanNetDataset(Dataset):
         )
 
         return {
-            "image_original": image,
-            "image_novel": image_novel,
-            "keypoints_original": padded_keypoints_original,
-            "keypoints_novel": padded_keypoints_novel,
-            "descriptors_original": padded_descriptors_original,
-            "descriptors_novel": padded_descriptors_novel,
-            "confidence_scores_original": padded_confidence_scores_original,
-            "confidence_scores_novel": padded_confidence_scores_novel,
+            "image0": image,
+            "image1": image_novel,
+            "image0_shape": image.shape,
+            "image1_shape": image_novel.shape,
+            "keypoints0": padded_keypoints_original,
+            "keypoints1": padded_keypoints_novel,
+            "descriptors0": padded_descriptors_original,
+            "descriptors1": padded_descriptors_novel,
+            "scores0": np.squeeze(padded_confidence_scores_original, axis=1),
+            "scores1": np.squeeze(padded_confidence_scores_novel, axis=1),
             "partial_assignment_matrix": partial_assignment_matrix,
         }

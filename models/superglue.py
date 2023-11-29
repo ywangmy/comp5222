@@ -688,10 +688,10 @@ class SuperGlue(nn.Module):
 
     def __init__(self, config):
         super().__init__()
-        self.config = {**self.default_config, **config}
+        self.config = config
         print("SuperGlue Config:", self.config)
 
-        if config["model"] == "ori":
+        if config["model_name"] == "ori":
             self.kenc = KeypointEncoder(
                 self.config["descriptor_dim"], self.config["keypoint_encoder"]
             )
@@ -700,37 +700,37 @@ class SuperGlue(nn.Module):
                 self.config["descriptor_dim"], self.config["keypoint_encoder"]
             )
 
-        if config["model"] == "ori":
+        if config["model_name"] == "ori":
             self.gnn = AttentionalGNN(
                 self.config["descriptor_dim"], self.config["GNN_layers"], num_heads=4
             )
 
-        elif config["model"] == "gat":
+        elif config["model_name"] == "gat":
             self.gnn = myGAT(
-                self.config["model"],
+                self.config["model_name"],
                 self.config["descriptor_dim"],
                 self.config["GNN_layers"],
                 num_heads=4,
             )
         # elif config['model'] == 'wgat':
         #     self.gnn = myWholeGAT(
-        #         self.config["model"],
+        #         self.config["model_name"],
         #         self.config["descriptor_dim"],
         #         self.config["GNN_layers"],
         #         num_heads=4,
         #     )
 
-        elif config["model"] == "rgat":
+        elif config["model_name"] == "rgat":
             self.gnn = myRGAT(
-                self.config["model"],
+                self.config["model_name"],
                 self.config["descriptor_dim"],
                 self.config["GNN_layers"],
                 num_heads=4,
             ).cuda()
 
-        elif config["model"] == "wrgat":
+        elif config["model_name"] == "wrgat":
             self.gnn = myWholeRGAT(
-                self.config["model"],
+                self.config["model_name"],
                 self.config["descriptor_dim"],
                 self.config["GNN_layers"],
                 num_heads=4,
@@ -752,10 +752,10 @@ class SuperGlue(nn.Module):
         bin_score = torch.nn.Parameter(torch.tensor(1.0))
         self.register_parameter("bin_score", bin_score)
 
-        if self.config["load_ckpt"] != None:
+        if self.config["load_ckpt_path"] != None:
             # assert self.config['weights'] in ['indoor', 'outdoor']
             path = Path(__file__).parent.parent
-            path = path / f'{self.config["load_ckpt"]}'
+            path = path / f'{self.config["load_ckpt_path"]}'
             print(torch.load(path))
             self.load_state_dict(torch.load(path))
             print(f"Loaded SuperGlue model ({path})")
@@ -784,7 +784,7 @@ class SuperGlue(nn.Module):
             }
 
         # file_name = data["file_name"]
-        all_matches = data["all_matches"]
+        # all_matches = data["all_matches"]
         # all_matches = data["all_matches"].permute(
         #     1, 2, 0
         # )  # shape=torch.Size([1, 87, 2])
@@ -853,7 +853,10 @@ class SuperGlue(nn.Module):
 
         # check if indexed correctly
 
-        batch_size, num_nodes, _ = all_matches.shape
+        partial_assignment_matrix = data["partial_assignment_matrix"]
+        # batch_size, num_nodes, _ = all_matches.shape
+        batch_size = partial_assignment_matrix.shape[0]
+        num_nodes = partial_assignment_matrix.shape[1] - 1
         # print(all_matches.shape)
         # print(len(data))
         # for k, v in data.items():
@@ -865,24 +868,26 @@ class SuperGlue(nn.Module):
         batch_loss = []
         for b in range(batch_size):
             loss = []
-            for i in range(num_nodes):
-                y = all_matches[b][i][0]
-                x = all_matches[b][i][1]
-                # print(i, y, i, x)
-                # print(scores[b][x][y].item(), scores[b][y][x].item())
-                if y != num_nodes:
-                    loss.append(-0.5 * torch.log(scores[b][i][y].exp()))
-                else:
-                    loss.append(-torch.log(scores[b][i][y].exp()))
-                if x != num_nodes:
-                    loss.append(-0.5 * torch.log(scores[b][x][i].exp()))
-                else:
-                    loss.append(-torch.log(scores[b][x][i].exp()))
-            loss_pt = torch.stack(loss)
-            loss_mean_unreshaped = torch.mean(loss_pt)
+            loss_matrix = -torch.logpartial_assignment_matrix[b] * scores[b]
+            loss_mean = torch.mean(loss_matrix)
+            # for i in range(num_nodes):
+            #     y = all_matches[b][i][0]
+            #     x = all_matches[b][i][1]
+            #     # print(i, y, i, x)
+            #     # print(scores[b][x][y].item(), scores[b][y][x].item())
+            #     if y != num_nodes:
+            #         loss.append(-0.5 * torch.log(scores[b][i][y].exp()))
+            #     else:
+            #         loss.append(-torch.log(scores[b][i][y].exp()))
+            #     if x != num_nodes:
+            #         loss.append(-0.5 * torch.log(scores[b][x][i].exp()))
+            #     else:
+            #         loss.append(-torch.log(scores[b][x][i].exp()))
+            # loss_pt = torch.stack(loss)
+            # loss_mean = torch.mean(loss_pt)
 
-            batch_loss.append(loss_mean_unreshaped.item())
-            total_loss += loss_mean_unreshaped
+            batch_loss.append(loss_mean.item())
+            total_loss += loss_mean
 
         total_loss /= batch_size
 

@@ -1,0 +1,7 @@
+---
+descriptor_dim: 128
+model_name: gat
+num_gnn_layers: 4
+graph_type: 1
+edge_pool: None
+batch_size: 12
