@@ -12,10 +12,10 @@ from pathlib import Path
 
 import matplotlib.cm as cm
 import torch.multiprocessing
-import wandb
 from torch.autograd import Variable
 from tqdm import tqdm
 
+import wandb
 from dataloader.feature_extractor import FeatureExtractor
 from dataloader.general import FeatureMatchingDataLoader
 from dataloader.perspective_warper import PerspectiveWarper
@@ -33,15 +33,22 @@ def get_args():
     )
 
     parser.add_argument("--config", "-c", type=str, default="./configs/default.yaml")
+    parser.add_argument("--mode", type=str, choices={"train", "test"})
+    parser.add_argument("--model_config_name", type=str)
     parser.add_argument("--load_epoch", type=int, default=None)
+    parser.add_argument(
+        "--eval",
+        action="store_true",
+        help="Perform the evaluation" " (requires ground truth pose and intrinsics)",
+    )
 
     opt = parser.parse_args()
     return opt
 
 
 def get_model_str(config):
-    superglue_config = config["Superglue"]
-    return f"{superglue_config['model_name']}-({config['train']['dataset']['COCO']['fraction']}|{config['train']['learning_rate']}-{config['train']['dataset']['batch_size']})-{superglue_config['match_threshold']}-{superglue_config['max_keypoints']}-{superglue_config[superglue_config['model_name']]['num_gnn_layers']}x{superglue_config[superglue_config['model_name']]['graph_type']}-{superglue_config[superglue_config['model_name']]['edge_pool']==None}"
+    superglue_config = config["superglue"]
+    return f"{superglue_config['model_name']}-({config['train']['dataset']['COCO']['fraction']}|{config['train']['learning_rate']}-{config['train']['dataset']['batch_size']})-{superglue_config['match_threshold']}-{superglue_config['max_keypoints']}-{superglue_config['num_gnn_layers']}x{superglue_config['graph_type']}-{superglue_config['edge_pool']==None}"
 
 
 def get_model_ckpt_path(config, epoch):
@@ -49,16 +56,18 @@ def get_model_ckpt_path(config, epoch):
 
 
 def get_superglue_config(config, epoch=None):
-    superglue_config = config["model"]
+    superglue_config = config["superglue"]
     superglue_config.update(
         {
             "load_ckpt_path": None
             if epoch == None
             else get_model_ckpt_path(config, epoch),
             "GNN_layers": (
-                ["self", "cross"] if config["model"]["graph_type"] == 2 else ["union"]
+                ["self", "cross"]
+                if config["superglue"]["graph_type"] == 2
+                else ["union"]
             )
-            * config["model"]["num_gnn_layers"],
+            * config["superglue"]["num_gnn_layers"],
         }
     )
     return superglue_config
@@ -84,10 +93,10 @@ def train(config):
     ), "Cannot use pdf extension with --fast_viz"
 
     # if (
-    #     config["model"]["model_name"] == "rgat"
-    #     or config["model"]["model_name"] == "wrgat"
+    #     config["superglue"]["model_name"] == "rgat"
+    #     or config["superglue"]["model_name"] == "wrgat"
     # ):
-    #     config["model"]["graph_type"] = 1
+    #     config["superglue"]["graph_type"] = 1
     # config['model']['graph_type']
     # config = {
     #     # "superpoint": config['feature_extraction']['Superpoint'],
@@ -109,7 +118,7 @@ def train(config):
         config["train"]["dataset"], feature_extractor, perspective_warper
     )
 
-    superglue = SuperGlue(config["Superglue"])
+    superglue = SuperGlue(config["superglue"])
 
     if torch.cuda.is_available():
         superglue.cuda()  # make sure it trains on GPU
@@ -256,20 +265,24 @@ def train(config):
 def aggregate_configs(opt, config, config_model):
     import warnings
 
-    config_model["load_epoch"] = opt.load_epoch
+    # config_model = config['superglue']
+    config_model["model_config_name"] = opt.model_config_name
+    # config_model = config_model[config_model['model_config_name']]
+
     config["mode"] = opt.mode
     config["eval"] = opt.eval
 
-    config["model"].update(config_model)  # Overwrite
+    config["superglue"].update(config_model)  # Overwrite
+    config["superglue"] = get_superglue_config(config, epoch=opt.load_epoch)
 
     # Unify ...
     # - batch_size
-    config["train"]["dataset"]["batch_size"] = config["model"]["batch_size"]
+    config["train"]["dataset"]["batch_size"] = config["superglue"]["batch_size"]
     # - descriptor_dim
     for key in ["descriptor_dim", "max_keypoints"]:
-        if config["feature_extraction"][key] != config["model"][key]:
+        if config["feature_extraction"][key] != config["superglue"][key]:
             warnings.warn(f"Unifying {key}")
-            config["feature_extraction"][key] = config["model"][key]
+            config["feature_extraction"][key] = config["superglue"][key]
 
     return config
 
@@ -279,21 +292,22 @@ def main():
     opt = get_args()
 
     config = read_file(opt.config)  # General configs
-    # config_model = read_file(
-    #     f"./configs/{opt.model_config_name}.yaml"
-    # )  # Model-specific configs
-    # config_model = config["model"]["config"]
-    # config = aggregate_configs(opt, config, config_model)
-    # print("Processed config:")
-    # print(config)
+    config_model = read_file(
+        f"./configs/superglue/{opt.model_config_name}.yaml"
+    )  # Model-specific configs
+    # config_model = config["superglue"]["config"]
+    config = aggregate_configs(opt, config, config_model)
+    print("Processed config:")
+    print(config)
+    print(config["superglue"])
 
     if config["mode"] == "train":
         train(config)
     elif config["mode"] == "test":
         # test(
         #     opt,
-        #     get_superglue_config(config, config["model"]["load_epoch"]),
-        #     get_model_ckpt_path(opt, config["model"]["load_epoch"]),
+        #     get_superglue_config(config, config["superglue"]["load_epoch"]),
+        #     get_model_ckpt_path(opt, config["superglue"]["load_epoch"]),
         # )
         test(config)
 

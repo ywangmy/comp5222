@@ -1,11 +1,8 @@
 %YAML 1.2
 ---
-# mode can be train or test
-mode: train
-
 train:
     num_epochs: 100
-    learning_rate: 0.0001
+    learning_rate: 1.0e-4
     output_dir: ./dump_match_pairs/ # Path to the directory in which the .npz results and optional, visualizations are written during training
     dataset:
         batch_size: 6
@@ -73,19 +70,13 @@ perspective_warper:
     nerf:
         novel_view_max_angle: 60 # Maximum angle (in degrees) between the new and old camera direction
 
-Superglue:
+superglue:
     sinkhorn_iterations: 100
     descriptor_dim: 128 # Dimension of the descriptor
     match_threshold: 0.1
     max_keypoints: 48
     batch_size: 1
     keypoint_encoder: [32, 64, 128]
-    model_name: gat-4-1
-
-    gat-4-1: ./superglue/gat-4-1.yaml
-    gat-9-2: ./superglue/gat-9-2.yaml
-    ori-9-2: ./superglue/ori-9-2.yaml
-    rgat-4-1: ./superglue/rgat-4-1.yaml
 
 # Visualize the matches and dump the plots
 viz: true

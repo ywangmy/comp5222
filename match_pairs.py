@@ -118,9 +118,9 @@ def test(config):
         "superpoint": {
             "nms_radius": opt.nms_radius,
             "keypoint_threshold": opt.keypoint_threshold,
-            "max_keypoints": config["model"]["max_keypoints"],
+            "max_keypoints": config["superglue"]["max_keypoints"],
         },
-        "superglue": config["Superglue"],
+        "superglue": config["superglue"],
     }
     matching = Matching(config).eval().to(device)
 

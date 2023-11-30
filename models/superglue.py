@@ -53,6 +53,8 @@ from torch_geometric.nn import MessagePassing
 def MLP(channels: list, do_bn=True):
     """Multi-layer perceptron"""
     n = len(channels)
+    for i in range(n):
+        channels[i] = (int)(channels[i])
     layers = []
     for i in range(1, n):
         layers.append(nn.Conv1d(channels[i - 1], channels[i], kernel_size=1, bias=True))
@@ -689,7 +691,7 @@ class SuperGlue(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.config = config
-        self.config.update(self.config[self.config["model_name"]])
+        # self.config.update(self.config[self.config["model_config_name"]])
         print("SuperGlue Config:", self.config)
 
         if config["model_name"] == "ori":
@@ -765,14 +767,18 @@ class SuperGlue(nn.Module):
         """Run SuperGlue on a pair of keypoints and descriptors"""
         # originally double
 
+        # for k, v in data.items():
+        #     print(k)
+        #     if torch.is_tensor(v):
+        #         print(v.shape)
         # print('Entering superglue')
         desc0, desc1 = data["descriptors0"].float(), data["descriptors1"].float()
         kpts0, kpts1 = data["keypoints0"].float(), data["keypoints1"].float()
 
-        # desc0 = desc0.transpose(0, 1)
-        # desc1 = desc1.transpose(0, 1)
-        # kpts0 = torch.reshape(kpts0, (1, -1, 2))
-        # kpts1 = torch.reshape(kpts1, (1, -1, 2))
+        desc0 = desc0.permute((0, 2, 1))
+        desc1 = desc1.permute((0, 2, 1))
+        # kpts0 = kpts0.permute((0, 2, 1))
+        # kpts1 = kpts1.permute((0, 2, 1))
 
         if kpts0.shape[1] == 0 or kpts1.shape[1] == 0:  # no keypoints
             shape0, shape1 = kpts0.shape[:-1], kpts1.shape[:-1]
@@ -858,34 +864,53 @@ class SuperGlue(nn.Module):
         # batch_size, num_nodes, _ = all_matches.shape
         batch_size = partial_assignment_matrix.shape[0]
         num_nodes = partial_assignment_matrix.shape[1] - 1
+        all_matches = num_nodes * torch.ones((batch_size, num_nodes, 2), dtype=int)
+        for b in range(batch_size):
+            for i in range(num_nodes):
+                for j in range(num_nodes):
+                    if partial_assignment_matrix[b][i][j] == 1:
+                        all_matches[b][i][0] = j
+                        all_matches[b][j][1] = i
         # print(all_matches.shape)
         # print(len(data))
         # for k, v in data.items():
         #     if k != 'file_name':
         #         print(k, v.shape)
-
+        # scores = nn.Softmax()
         total_loss = 0
         # print('batch_size', batch_size)
         batch_loss = []
         for b in range(batch_size):
             loss = []
-            loss_matrix = -torch.logpartial_assignment_matrix[b] * scores[b]
-            loss_mean = torch.mean(loss_matrix)
-            # for i in range(num_nodes):
-            #     y = all_matches[b][i][0]
-            #     x = all_matches[b][i][1]
-            #     # print(i, y, i, x)
-            #     # print(scores[b][x][y].item(), scores[b][y][x].item())
-            #     if y != num_nodes:
-            #         loss.append(-0.5 * torch.log(scores[b][i][y].exp()))
-            #     else:
-            #         loss.append(-torch.log(scores[b][i][y].exp()))
-            #     if x != num_nodes:
-            #         loss.append(-0.5 * torch.log(scores[b][x][i].exp()))
-            #     else:
-            #         loss.append(-torch.log(scores[b][x][i].exp()))
-            # loss_pt = torch.stack(loss)
-            # loss_mean = torch.mean(loss_pt)
+            # loss_matrix = - partial_assignment_matrix[b] * scores[b]
+            # loss_mean = torch.mean(loss_matrix)
+            for i in range(num_nodes):
+                y = all_matches[b][i][0]
+                x = all_matches[b][i][1]
+                # print(i, y, i, x)
+                # print(scores[b][i][y].item(), scores[b][y][i].item())
+                # print(scores[b][i][y].exp().item(), scores[b][y][i].exp().item())
+                # print(torch.log(scores[b][i][y].exp()).item(), torch.log(scores[b][y][i].exp()).item())
+                if y != num_nodes:
+                    # loss.append(-0.5 * torch.log(scores[b][i][y].exp()))
+                    loss.append(-0.5 * scores[b][i][y])
+                else:
+                    # loss.append(-torch.log(scores[b][i][y].exp()))
+                    loss.append(-scores[b][i][y].exp())
+                if x != num_nodes:
+                    # loss.append(-0.5 * torch.log(scores[b][x][i].exp()))
+                    loss.append(-0.5 * scores[b][x][i].exp())
+                else:
+                    # loss.append(-torch.log(scores[b][x][i].exp()))
+                    loss.append(-scores[b][x][i].exp())
+                # print(loss[-1].item())
+                # print('-----')
+            loss_pt = torch.stack(loss)
+            # print(loss_pt)
+            loss_mean = torch.mean(loss_pt)
+            if torch.any(loss_mean.isnan()):
+                print("loss mean nan", b)
+                exit()
 
             batch_loss.append(loss_mean.item())
             total_loss += loss_mean
