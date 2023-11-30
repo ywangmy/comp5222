@@ -65,7 +65,7 @@ perspective_warper:
 
     homography:
         perturbation_threshold: 0.25 # (0, 1.0] Perturbation threshold for homography matrix
-        random_rotation: true
+        random_rotation: false
 
     nerf:
         novel_view_max_angle: 60 # Maximum angle (in degrees) between the new and old camera direction

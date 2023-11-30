@@ -215,4 +215,5 @@ class COCODataset(Dataset):
             "scores0": np.squeeze(padded_confidence_scores_original, axis=1),
             "scores1": np.squeeze(padded_confidence_scores_novel, axis=1),
             "partial_assignment_matrix": partial_assignment_matrix,
+            "file_name": file,
         }

@@ -152,6 +152,8 @@ def train(config):
                         input[k] = Variable(torch.stack(input[k]).cuda())
 
             output = superglue(input)  # originally not .float()
+
+            # Visualization
             for k, v in input.items():
                 input[k] = v[0]
             # input = {**input, **output}
@@ -193,8 +195,8 @@ def train(config):
                 # Visualize the matches.
                 superglue.eval()
                 image0, image1 = (
-                    input["image0"].cpu().numpy()[0] * 255.0,
-                    input["image1"].cpu().numpy()[0] * 255.0,
+                    input["image0"].cpu().numpy() * 255.0,
+                    input["image1"].cpu().numpy() * 255.0,
                 )
 
                 kpts0, kpts1 = (
@@ -205,8 +207,16 @@ def train(config):
                     output["matches0"][0].cpu().detach().numpy(),
                     output["matching_scores0"][0].cpu().detach().numpy(),
                 )
-                image0 = read_image_modified(image0, opt.resize, config["resize_float"])
-                image1 = read_image_modified(image1, opt.resize, config["resize_float"])
+                image0 = read_image_modified(
+                    image0,
+                    config["train"]["dataset"]["COCO"]["resize"],
+                    config["resize_float"],
+                )
+                image1 = read_image_modified(
+                    image1,
+                    config["train"]["dataset"]["COCO"]["resize"],
+                    config["resize_float"],
+                )
                 valid = matches > -1
                 mkpts0 = kpts0[valid]
                 mkpts1 = kpts1[matches[valid]]
