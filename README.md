@@ -34,10 +34,16 @@ wget http://images.cocodataset.org/zips/test2014.zip
 To train the SuperGlue with default parameters, run the following command:
 
 ```shell
-./train.py
+./train_<model_name>.sh
 ```
 
-### 4. Additional useful command line parameters
+### 4. Testing Directions
+
+```shell
+./test_<model_name>.sh
+```
+
+### 5. Additional useful command line parameters
 
 - Use `--epoch` to set the number of epochs (default: `20`).
 - Use `--train_path` to set the path to the directory of training images.
@@ -45,7 +51,7 @@ To train the SuperGlue with default parameters, run the following command:
 - Use `--show_keypoints` to visualize the detected keypoints (default: `False`).
 - Use `--viz_extension` to set the visualization file extension (default: `png`). Use pdf for highest-quality.
 
-### 5. Visualization Demo
+### 6. Visualization Demo
 
 The matches are colored by their predicted confidence in a jet colormap (Red: more confident, Blue: less confident).
 
