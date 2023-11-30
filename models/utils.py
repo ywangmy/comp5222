@@ -646,3 +646,43 @@ def error_colormap(x):
     return np.clip(
         np.stack([2 - x * 2, x * 2, np.zeros_like(x), np.ones_like(x)], -1), 0, 1
     )
+
+
+def construct_confusion_matrix(input_partial_assignment_matrix, output_matches0):
+    input_assignment_matrix = input_partial_assignment_matrix[:-1, :-1]
+    output_assignment_matrix = torch.zeros_like(input_assignment_matrix)
+    for i in range(len(output_matches0)):
+        if not output_matches0[i] == -1:
+            output_assignment_matrix[i, output_matches0[i]] = 1
+
+    mutual_assignment_matrix = torch.logical_and(
+        input_assignment_matrix, output_assignment_matrix
+    )
+
+    TP = torch.sum(mutual_assignment_matrix)
+
+    FP = torch.sum(output_assignment_matrix) - TP
+
+    FN = torch.sum(input_assignment_matrix) - TP
+
+    confusion_matrix = torch.zeros((2, 2))
+    confusion_matrix[0, 0] = TP
+    confusion_matrix[0, 1] = FP
+    confusion_matrix[1, 0] = FN
+
+    return confusion_matrix
+
+
+def compute_precision_recall(input_partial_assignment_matrix, output_matches0):
+    confusion_matrix = construct_confusion_matrix(
+        input_partial_assignment_matrix, output_matches0
+    )
+
+    TP = confusion_matrix[0, 0]
+    FP = confusion_matrix[0, 1]
+    FN = confusion_matrix[1, 0]
+
+    precision = TP / (TP + FP)
+    recall = TP / (TP + FN)
+
+    return precision, recall
