@@ -1,9 +1,12 @@
 %YAML 1.2
 ---
+# mode can be train or test
+mode: train
+
 train:
     num_epochs: 100
     learning_rate: 0.0001
-    output_dir: dump_match_pairs/   # Path to the directory in which the .npz results and optional, visualizations are written during training
+    output_dir: ./dump_match_pairs/ # Path to the directory in which the .npz results and optional, visualizations are written during training
     dataset:
         batch_size: 6
         shuffle: false
@@ -21,9 +24,9 @@ train:
         #     fix_warp: false
 
 eval:
-    input_dir: assets/scannet_sample_images/ # Path to the directory that contains the images
+    input_dir: ./assets/scannet_sample_images/ # Path to the directory that contains the images
     output_dir: ./dump_match_pairs/
-    input_pairs: assets/scannet_sample_pairs_with_gt.txt # Path to the list of image pairs for evaluation
+    input_pairs: ./assets/scannet_sample_pairs_with_gt.txt # Path to the list of image pairs for evaluation
     eval_interval: 5 # evaluate 1 epoch every "eval_interval" training epochs
 
     dataset:
@@ -45,49 +48,68 @@ eval:
 feature_extraction:
     max_keypoints: 48 # Maximum number of keypoints
     descriptor_dim: 128 # Dimension of the descriptor
+    extractor: SIFT
 
-    extractor:
-        SIFT:
-            contrast_threshold: 0.0001
-            edge_threshold: 10
-            sigma: 1.6
+    SIFT:
+        contrast_threshold: 0.0001
+        edge_threshold: 10
+        sigma: 1.6
 
-        # Superpoint:
-        #     keypoint_threshold: 0.005 # SuperPoint keypoint detector confidence threshold
-        #     nms_radius: 4 # SuperPoint Non Maximum Suppression (NMS) radius
-        #     match_threshold: 0.1 # SuperGlue match threshold
-        #     remove_borders: 4
-        #     model_weight_path: ./models/weights/superpoint_v1.pth
+    Superpoint:
+        keypoint_threshold: 0.005 # SuperPoint keypoint detector confidence threshold
+        nms_radius: 4 # SuperPoint Non Maximum Suppression (NMS) radius
+        match_threshold: 0.1 # SuperGlue match threshold
+        remove_borders: 4
+        model_weight_path: ./models/weights/superpoint_v1.pth
 
 perspective_warper:
     max_warp_match_pixel_distance: 2 # Maximum pixel distance between the matches to be considered for homography estimation
+    warper: homography
 
     homography:
         perturbation_threshold: 0.25 # (0, 1.0] Perturbation threshold for homography matrix
         random_rotation: true
 
-    # nerf:
-    #     novel_view_max_angle: 60 # Maximum angle (in degrees) between the new and old camera direction
+    nerf:
+        novel_view_max_angle: 60 # Maximum angle (in degrees) between the new and old camera direction
 
-model:
+Superglue:
     sinkhorn_iterations: 100
-    descriptor_dim: 128
+    descriptor_dim: 128 # Dimension of the descriptor
     match_threshold: 0.1
     max_keypoints: 48
     batch_size: 1
     keypoint_encoder: [32, 64, 128]
-# superglue:
-#     num_layers: 3
-#     sinkhorn_iterations: 10
-#     match_threshold: 0.2
-#     descriptor_dim: 128 # Dimension of the descriptor
+    model_name: gat-4-1
 
-viz: true # Visualize the matches and dump the plots
-# visualize_output_dir: ./dump_match_pairs/ # Output directory for the visualization
-show_keypoints: true # Plot the keypoints in addition to the matches
-resize_float: false # Resize the image after casting uint8 to float
-cache: false # Skip the pair if output .npz files are already found
-fast_viz: true # Use faster image visualization based on OpenCV instead of Matplotlib
-viz_extension: png # png or pdf
-opencv_display: False, Visualize via OpenCV before saving output images
-max_length: -1 # Maximum number of pairs to evaluate
+    gat-4-1: ./superglue/gat-4-1.yaml
+    gat-9-2: ./superglue/gat-9-2.yaml
+    ori-9-2: ./superglue/ori-9-2.yaml
+    rgat-4-1: ./superglue/rgat-4-1.yaml
+
+# Visualize the matches and dump the plots
+viz: true
+
+# # Output directory for the visualization
+# visualize_output_dir: ./dump_match_pairs/
+
+# Plot the keypoints in addition to the matches
+show_keypoints: true
+
+# Resize the image after casting uint8 to float
+resize_float: false
+
+# Skip the pair if output .npz files are already found
+cache: false
+
+# Use faster image visualization based on OpenCV instead of Matplotlib
+fast_viz: true
+
+# png or pdf
+viz_extension: png
+
+# Visualize via OpenCV before saving output images
+opencv_display: false
+
+# Maximum number of pairs to evaluate
+max_length: -1

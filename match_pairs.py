@@ -67,7 +67,8 @@ from models.utils import scale_intrinsics
 torch.set_grad_enabled(False)
 
 
-def test(opt, superglue_config, model_ckpt_path):
+# def test(opt, superglue_config, model_ckpt_path):
+def test(config):
     assert not (
         config["opencv_display"] and not config["viz"]
     ), "Must use --viz with --opencv_display"
@@ -119,7 +120,7 @@ def test(opt, superglue_config, model_ckpt_path):
             "keypoint_threshold": opt.keypoint_threshold,
             "max_keypoints": config["model"]["max_keypoints"],
         },
-        "superglue": superglue_config,
+        "superglue": config["Superglue"],
     }
     matching = Matching(config).eval().to(device)
 

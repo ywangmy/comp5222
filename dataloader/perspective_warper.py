@@ -16,18 +16,16 @@ import torch
 
 class PerspectiveWarper(ABC):
     def __new__(cls, config):
-        if config is None:
+        if config["warper"] is None:
             raise ValueError("Missing perspective warper config")
 
-        if "homography" in config:
+        if config["warper"] == "homography":
             return super(PerspectiveWarper, cls).__new__(HomographyWarper)
-        elif "nerf" in config:
+        elif config["warper"] == "nerf":
             return super(PerspectiveWarper, cls).__new__(NerFWarper)
         else:
             raise ValueError(
-                "Unsupported perspective warper type "
-                + next(iter(config))
-                + " in config"
+                "Unsupported perspective warper type " + config["warper"] + " in config"
             )
 
     def __init__(self, config):

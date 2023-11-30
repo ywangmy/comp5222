@@ -689,6 +689,7 @@ class SuperGlue(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.config = config
+        self.config.update(self.config[self.config["model_name"]])
         print("SuperGlue Config:", self.config)
 
         if config["model_name"] == "ori":

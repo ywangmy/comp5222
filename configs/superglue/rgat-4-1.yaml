@@ -1,4 +1,6 @@
+%YAML 1.2
 ---
+load_epoch: 100
 descriptor_dim: 128
 model_name: wrgat
 num_gnn_layers: 4

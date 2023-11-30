@@ -1,21 +1,29 @@
+#!/usr/bin/env python3
+#
+# Created on Wed Nov 29 2023 23:31:36
+# Author: Mukai (Tom Notch) Yu, Yicheng Wang
+# Email: myual@connect.ust.hk, ywangmy@connect.ust.hk
+# Affiliation: Hong Kong University of Science and Technology
+#
+# Copyright Ⓒ 2023 Mukai (Tom Notch) Yu, Yicheng Wang
+#
 import argparse
 from pathlib import Path
 
 import matplotlib.cm as cm
 import torch.multiprocessing
+import wandb
 from torch.autograd import Variable
 from tqdm import tqdm
 
-import wandb
 from dataloader.feature_extractor import FeatureExtractor
 from dataloader.general import FeatureMatchingDataLoader
 from dataloader.perspective_warper import PerspectiveWarper
-from dataloader.visualization import visualize_matches
-from load_data import SparseDataset
+from match_pairs import test
 from models.superglue import SuperGlue
-from models.superpoint import SuperPoint
 from models.utils import make_matching_plot
 from models.utils import read_image_modified
+from utils.files import read_file
 
 
 def get_args():
@@ -24,147 +32,7 @@ def get_args():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
 
-    parser.add_argument("--model_config_name")
-    parser.add_argument("--mode", choices={"train", "test"}, default="train")
-
-    # parser.add_argument(
-    #     "--viz", action="store_true", help="Visualize the matches and dump the plots"
-    # )
-    parser.add_argument(
-        "--eval",
-        action="store_true",
-        help="Perform the evaluation" " (requires ground truth pose and intrinsics)",
-    )
-
-    # parser.add_argument(
-    #     "--superglue",
-    #     choices={"indoor", "outdoor"},
-    #     default="indoor",
-    #     help="SuperGlue weights",
-    # )
-    # parser.add_argument(
-    #     "--max_keypoints",
-    #     type=int,
-    #     default=48,
-    #     help="Maximum number of keypoints detected by Superpoint"
-    #     " ('-1' keeps all keypoints)",
-    # )
-
-    # parser.add_argument(
-    #     "--keypoint_threshold",
-    #     type=float,
-    #     default=0.005,
-    #     help="SuperPoint keypoint detector confidence threshold",
-    # )
-    # parser.add_argument(
-    #     "--nms_radius",
-    #     type=int,
-    #     default=4,
-    #     help="SuperPoint Non Maximum Suppression (NMS) radius" " (Must be positive)",
-    # )
-    # parser.add_argument(
-    #     "--sinkhorn_iterations",
-    #     type=int,
-    #     default=20,
-    #     help="Number of Sinkhorn iterations performed by SuperGlue",
-    # )
-    # parser.add_argument(
-    #     "--match_threshold", type=float, default=0.2, help="SuperGlue match threshold"
-    # )
-
-    # parser.add_argument(
-    #     "--resize",
-    #     type=int,
-    #     nargs="+",
-    #     default=[640, 480],
-    #     help="Resize the input image before running inference. If two numbers, "
-    #     "resize to the exact dimensions, if one number, resize the max "
-    #     "dimension, if -1, do not resize",
-    # )
-    # parser.add_argument(
-    #     "--resize_float",
-    #     action="store_true",
-    #     help="Resize the image after casting uint8 to float",
-    # )
-
-    # parser.add_argument(
-    #     "--cache",
-    #     action="store_true",
-    #     help="Skip the pair if output .npz files are already found",
-    # )
-    # parser.add_argument(
-    #     "--show_keypoints",
-    #     action="store_true",
-    #     help="Plot the keypoints in addition to the matches",
-    # )
-    # parser.add_argument(
-    #     "--fast_viz",
-    #     action="store_true",
-    #     help="Use faster image visualization based on OpenCV instead of Matplotlib",
-    # )
-    # parser.add_argument(
-    #     "--viz_extension",
-    #     type=str,
-    #     default="png",
-    #     choices=["png", "pdf"],
-    #     help="Visualization file extension. Use pdf for highest-quality.",
-    # )
-
-    # parser.add_argument(
-    #     "--opencv_display",
-    #     action="store_true",
-    #     help="Visualize via OpenCV before saving output images",
-    # )
-    # parser.add_argument(
-    #     "--input_pairs",
-    #     type=str,
-    #     default="assets/scannet_sample_pairs_with_gt.txt",
-    #     help="Path to the list of image pairs for evaluation",
-    # )
-    # parser.add_argument(
-    #     "--shuffle",
-    #     action="store_true",
-    #     help="Shuffle ordering of pairs before processing",
-    # )
-    # parser.add_argument(
-    #     "--max_length", type=int, default=-1, help="Maximum number of pairs to evaluate"
-    # )
-
-    # parser.add_argument(
-    #     "--input_dir",
-    #     type=str,
-    #     default="assets/scannet_sample_images/",
-    #     help="Path to the directory that contains the images",
-    # )
-    # parser.add_argument(
-    #     "--output_dir",
-    #     type=str,
-    #     default="dump_match_pairs/",
-    #     help="Path to the directory in which the .npz results and optional,"
-    #     "visualizations are written",
-    # )
-
-    # parser.add_argument(
-    #     "--learning_rate", type=float, default=0.0001, help="Learning rate"
-    # )
-
-    # parser.add_argument("--batch_size", type=int, default=1, help="batch_size")
-    # parser.add_argument(
-    #     "--train_path",
-    #     type=str,
-    #     default="./COCO2014/train2014/",
-    #     help="Path to the directory of training imgs.",
-    # )
-    # parser.add_argument("--num_epochs", type=int, default=100, help="Number of epoches")
-
-    # parser.add_argument("--descriptor_dim", type=int, default=128)
-
-    # parser.add_argument("--fraction", type=float, default=1.0)
-
-    # parser.add_argument("--model", default="gat")
-    # parser.add_argument("--num_gnn_layers", type=int, default=3)
-    # parser.add_argument("--graph_type", type=int, default=2)
-    # parser.add_argument("--edge_pool", type=list, default=None)
+    parser.add_argument("--config", "-c", type=str, default="./configs/default.yaml")
     parser.add_argument("--load_epoch", type=int, default=None)
 
     opt = parser.parse_args()
@@ -172,7 +40,8 @@ def get_args():
 
 
 def get_model_str(config):
-    return f"{config['model']['model_name']}-({config['train']['dataset']['COCO']['fraction']}|{config['train']['learning_rate']}-{config['model']['batch_size']})-{config['model']['match_threshold']}-{config['model']['max_keypoints']}-{config['model']['num_gnn_layers']}x{config['model']['graph_type']}-{config['model']['edge_pool']==None}"
+    superglue_config = config["Superglue"]
+    return f"{superglue_config['model_name']}-({config['train']['dataset']['COCO']['fraction']}|{config['train']['learning_rate']}-{config['train']['dataset']['batch_size']})-{superglue_config['match_threshold']}-{superglue_config['max_keypoints']}-{superglue_config[superglue_config['model_name']]['num_gnn_layers']}x{superglue_config[superglue_config['model_name']]['graph_type']}-{superglue_config[superglue_config['model_name']]['edge_pool']==None}"
 
 
 def get_model_ckpt_path(config, epoch):
@@ -195,7 +64,8 @@ def get_superglue_config(config, epoch=None):
     return superglue_config
 
 
-def train(config, superglue_config, get_model_str_func):
+# def train(config, superglue_config, get_model_str_func):
+def train(config):
     torch.set_grad_enabled(True)
     torch.multiprocessing.set_sharing_strategy("file_system")
 
@@ -213,11 +83,11 @@ def train(config, superglue_config, get_model_str_func):
         config["fast_viz"] and config["viz_extension"] == "pdf"
     ), "Cannot use pdf extension with --fast_viz"
 
-    if (
-        config["model"]["model_name"] == "rgat"
-        or config["model"]["model_name"] == "wrgat"
-    ):
-        config["model"]["graph_type"] = 1
+    # if (
+    #     config["model"]["model_name"] == "rgat"
+    #     or config["model"]["model_name"] == "wrgat"
+    # ):
+    #     config["model"]["graph_type"] = 1
     # config['model']['graph_type']
     # config = {
     #     # "superpoint": config['feature_extraction']['Superpoint'],
@@ -225,7 +95,7 @@ def train(config, superglue_config, get_model_str_func):
     # }
 
     # store viz results
-    output_dir = Path(config["train"]["output_dir"]) / get_model_str_func(config)
+    output_dir = Path(config["train"]["output_dir"]) / get_model_str(config)
     output_dir.mkdir(exist_ok=True, parents=True)
     print("Will write visualization images to", 'directory "{}"'.format(output_dir))
 
@@ -238,18 +108,8 @@ def train(config, superglue_config, get_model_str_func):
     train_loader = FeatureMatchingDataLoader(
         config["train"]["dataset"], feature_extractor, perspective_warper
     )
-    # train_set = SparseDataset(
-    #     opt.train_path, config['model']['max_keypoints'], config['train']['dataset']['COCO']['fraction'], opt.resize
-    # )
-    # train_loader = torch.utils.data.DataLoader(
-    #     dataset=train_set,
-    #     shuffle=False,
-    #     batch_size=config['model']['batch_size'],
-    #     drop_last=True,
-    #     # collate_fn=train_set.collate_fn,
-    # )
 
-    superglue = SuperGlue(superglue_config)
+    superglue = SuperGlue(config["Superglue"])
 
     if torch.cuda.is_available():
         superglue.cuda()  # make sure it trains on GPU
@@ -268,7 +128,6 @@ def train(config, superglue_config, get_model_str_func):
     )
 
     # start training
-
     for epoch in range(1, config["train"]["num_epochs"] + 1):
         epoch_loss = 0
         # originally double
@@ -329,7 +188,6 @@ def train(config, superglue_config, get_model_str_func):
                     input["image1"].cpu().numpy()[0] * 255.0,
                 )
 
-                # import pdb; pdb.set_trace()
                 kpts0, kpts1 = (
                     input["keypoints0"].cpu().numpy(),
                     input["keypoints1"].cpu().numpy(),
@@ -419,26 +277,25 @@ def aggregate_configs(opt, config, config_model):
 def main():
     # Configuration
     opt = get_args()
-    from utils.files import read_file, print_dict
 
-    config = read_file("./configs/default.yaml")  # General configs
-    config_model = read_file(
-        f"./configs/{opt.model_config_name}.yaml"
-    )  # Model-specific configs
-    config = aggregate_configs(opt, config, config_model)
-    print("Processed config:")
-    print(config)
+    config = read_file(opt.config)  # General configs
+    # config_model = read_file(
+    #     f"./configs/{opt.model_config_name}.yaml"
+    # )  # Model-specific configs
+    # config_model = config["model"]["config"]
+    # config = aggregate_configs(opt, config, config_model)
+    # print("Processed config:")
+    # print(config)
 
     if config["mode"] == "train":
-        train(config, get_superglue_config(config), get_model_str)
+        train(config)
     elif config["mode"] == "test":
-        from match_pairs import test
-
-        test(
-            opt,
-            get_superglue_config(config, config["model"]["load_epoch"]),
-            get_model_ckpt_path(opt, config["model"]["load_epoch"]),
-        )
+        # test(
+        #     opt,
+        #     get_superglue_config(config, config["model"]["load_epoch"]),
+        #     get_model_ckpt_path(opt, config["model"]["load_epoch"]),
+        # )
+        test(config)
 
 
 if __name__ == "__main__":

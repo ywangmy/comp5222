@@ -29,18 +29,17 @@ class FeatureExtractor(ABC):
         cls, config, device=torch.device("cuda" if torch.cuda.is_available() else "cpu")
     ):
         # Use __new__ to create an instance of the appropriate subclass
-        extractor_config = config["extractor"]
-        if extractor_config is None:
+        if config["extractor"] is None:
             raise ValueError("Missing extractor config")
 
-        if "SIFT" in extractor_config:
+        if config["extractor"] == "SIFT":
             return super(FeatureExtractor, cls).__new__(SiftExtractor)
-        elif "Superpoint" in extractor_config:
+        elif config["extractor"] == "Superpoint":
             return super(FeatureExtractor, cls).__new__(SuperpointExtractor)
         else:
             raise ValueError(
                 "Unsupported feature extractor type "
-                + next(iter(extractor_config))
+                + config["extractor"]
                 + " in config"
             )
 
@@ -72,11 +71,9 @@ class SiftExtractor(FeatureExtractor):
         device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
     ):
         super().__init__(config)
-        self.contrast_threshold = float(
-            config["extractor"]["SIFT"]["contrast_threshold"]
-        )
-        self.edge_threshold = float(config["extractor"]["SIFT"]["edge_threshold"])
-        self.sigma = float(config["extractor"]["SIFT"]["sigma"])
+        self.contrast_threshold = float(config["SIFT"]["contrast_threshold"])
+        self.edge_threshold = float(config["SIFT"]["edge_threshold"])
+        self.sigma = float(config["SIFT"]["sigma"])
 
         self.sift = cv2.SIFT_create(
             nfeatures=self.max_keypoints,
@@ -104,7 +101,7 @@ class SuperpointExtractor(FeatureExtractor):
         device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
     ):
         super().__init__(config)
-        self.superpoint_config = config["extractor"]["Superpoint"]
+        self.superpoint_config = config["Superpoint"]
         self.superpoint_config["max_keypoints"] = self.max_keypoints
         self.superpoint_config["descriptor_dim"] = self.descriptor_dim
         self.superpoint_config["nms_radius"] = int(self.superpoint_config["nms_radius"])
