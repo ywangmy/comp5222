@@ -115,7 +115,7 @@ class SuperpointExtractor(FeatureExtractor):
         )
 
         # Pass the image through the SuperPoint model
-        result = self.superpoint({"image": input_tensor})
+        result = self.superpoint(input_tensor)
         return (
             result["keypoints"][0].to("cpu"),
             result["descriptors"][0].T.to("cpu"),
