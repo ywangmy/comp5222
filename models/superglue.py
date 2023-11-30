@@ -852,6 +852,7 @@ class SuperGlue(nn.Module):
         mutual1 = arange_like(indices1, 1)[None] == indices0.gather(1, indices1)
         zero = scores.new_tensor(0)
         mscores0 = torch.where(mutual0, max0.values.exp(), zero)
+        # print('mscore0', mscores0.shape)
         mscores1 = torch.where(mutual1, mscores0.gather(1, indices1), zero)
         valid0 = mutual0 & (mscores0 > self.config["match_threshold"])
         valid1 = mutual1 & valid0.gather(1, indices1)
@@ -876,7 +877,7 @@ class SuperGlue(nn.Module):
         # for k, v in data.items():
         #     if k != 'file_name':
         #         print(k, v.shape)
-        # scores = nn.Softmax()
+        # scores = nn.functional.softmax(scores, dim=2)
         total_loss = 0
         # print('batch_size', batch_size)
         batch_loss = []
@@ -893,16 +894,16 @@ class SuperGlue(nn.Module):
                 # print(torch.log(scores[b][i][y].exp()).item(), torch.log(scores[b][y][i].exp()).item())
                 if y != num_nodes:
                     # loss.append(-0.5 * torch.log(scores[b][i][y].exp()))
-                    loss.append(-0.5 * scores[b][i][y])
+                    loss.append(-0.5 * torch.log(scores[b][i][y]))
                 else:
                     # loss.append(-torch.log(scores[b][i][y].exp()))
-                    loss.append(-scores[b][i][y])
+                    loss.append(-torch.log(scores[b][i][y]))
                 if x != num_nodes:
                     # loss.append(-0.5 * torch.log(scores[b][x][i].exp()))
-                    loss.append(-0.5 * scores[b][x][i])
+                    loss.append(-0.5 * torch.log(scores[b][x][i]))
                 else:
                     # loss.append(-torch.log(scores[b][x][i].exp()))
-                    loss.append(-scores[b][x][i])
+                    loss.append(-torch.log(scores[b][x][i]))
                 # print(loss[-1].item())
                 # print('-----')
             loss_pt = torch.stack(loss)
