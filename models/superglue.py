@@ -737,7 +737,7 @@ class SuperGlue(nn.Module):
                 self.config["descriptor_dim"],
                 self.config["GNN_layers"],
                 num_heads=4,
-                edge_pool=[0.1, 0.5, 0.5, 0.5, 1, 1, 1, 1, 1],
+                edge_pool=self.config["edge_pool"],
             ).cuda()
 
         self.final_proj = nn.Conv1d(
@@ -759,8 +759,7 @@ class SuperGlue(nn.Module):
             # assert self.config['weights'] in ['indoor', 'outdoor']
             path = Path(__file__).parent.parent
             path = path / f'{self.config["load_ckpt_path"]}'
-            print(torch.load(path))
-            self.load_state_dict(torch.load(path))
+            self = torch.load(path)
             print(f"Loaded SuperGlue model ({path})")
 
     def forward(self, data):

@@ -5,5 +5,5 @@ descriptor_dim: 128
 model_name: wrgat
 num_gnn_layers: 4
 graph_type: 1
-edge_pool: None
+edge_pool: [0.1, 0.5, 0.5, 0.5, 1, 1, 1, 1, 1]
 batch_size: 4

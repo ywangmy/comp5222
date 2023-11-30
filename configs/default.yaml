@@ -20,18 +20,18 @@ train:
         #     resize: [640, 480] # [width, height] Resize the input image before running inference. Comment out if you don't want to resize
         #     fix_warp: false
 
-eval:
+test:
     input_dir: ./assets/scannet_sample_images/ # Path to the directory that contains the images
-    output_dir: ./dump_match_pairs/
-    input_pairs: ./assets/scannet_sample_pairs_with_gt.txt # Path to the list of image pairs for evaluation
-    eval_interval: 5 # evaluate 1 epoch every "eval_interval" training epochs
+    output_dir: ./dump_match_pairs_test/
+    # input_pairs: ./assets/scannet_sample_pairs_with_gt.txt # Path to the list of image pairs for evaluation
+    # eval_interval: 5 # evaluate 1 epoch every "eval_interval" training epochs
 
     dataset:
-        batch_size: 32
+        batch_size: 16
         shuffle: false
 
         COCO:
-            path: ./COCO2014/eval2014
+            path: ./COCO2014/test2014
             fraction: 0.01
             resize: [640, 480] # [width, height] Resize the input image before running inference. Comment out if you don't want to resize
             fix_warp: true
@@ -64,7 +64,7 @@ perspective_warper:
     warper: homography
 
     homography:
-        perturbation_threshold: 0.25 # (0, 1.0] Perturbation threshold for homography matrix
+        perturbation_threshold: 0.1 # (0, 1.0] Perturbation threshold for homography matrix
         random_rotation: false
 
     nerf:

@@ -48,7 +48,7 @@ def get_args():
 
 def get_model_str(config):
     superglue_config = config["superglue"]
-    return f"{superglue_config['model_name']}-({config['train']['dataset']['COCO']['fraction']}|{config['train']['learning_rate']}-{config['train']['dataset']['batch_size']})-{superglue_config['match_threshold']}-{superglue_config['max_keypoints']}-{superglue_config['num_gnn_layers']}x{superglue_config['graph_type']}-{superglue_config['edge_pool']==None}"
+    return f"{superglue_config['model_name']}-({config['train']['dataset']['COCO']['fraction']}|{config['train']['learning_rate']}-{superglue_config['batch_size']})-{superglue_config['match_threshold']}-{superglue_config['max_keypoints']}-{superglue_config['num_gnn_layers']}x{superglue_config['graph_type']}-{superglue_config['edge_pool']==None}"
 
 
 def get_model_ckpt_path(config, epoch):
@@ -77,31 +77,6 @@ def get_superglue_config(config, epoch=None):
 def train(config):
     torch.set_grad_enabled(True)
     torch.multiprocessing.set_sharing_strategy("file_system")
-
-    # make sure the flags are properly used
-    assert not (
-        config["opencv_display"] and not config["viz"]
-    ), "Must use --viz with --opencv_display"
-    assert not (
-        config["opencv_display"] and not config["fast_viz"]
-    ), "Cannot use --opencv_display without --fast_viz"
-    assert not (
-        config["fast_viz"] and not config["viz"]
-    ), "Must use --viz with --fast_viz"
-    assert not (
-        config["fast_viz"] and config["viz_extension"] == "pdf"
-    ), "Cannot use pdf extension with --fast_viz"
-
-    # if (
-    #     config["superglue"]["model_name"] == "rgat"
-    #     or config["superglue"]["model_name"] == "wrgat"
-    # ):
-    #     config["superglue"]["graph_type"] = 1
-    # config['model']['graph_type']
-    # config = {
-    #     # "superpoint": config['feature_extraction']['Superpoint'],
-    #     "superglue": superglue_config,
-    # }
 
     # store viz results
     output_dir = Path(config["train"]["output_dir"]) / get_model_str(config)
@@ -272,6 +247,104 @@ def train(config):
         )
 
 
+def test(config):
+    # torch.set_grad_enabled(True)
+    # torch.multiprocessing.set_sharing_strategy("file_system")
+
+    # store viz results
+    output_dir = Path(config["test"]["output_dir"]) / get_model_str(config)
+    output_dir.mkdir(exist_ok=True, parents=True)
+    print("Will write visualization images to", 'directory "{}"'.format(output_dir))
+
+    # torch.autograd.set_detect_anomaly(True)
+
+    # load training data
+    feature_extractor = FeatureExtractor(config["feature_extraction"])
+    perspective_warper = PerspectiveWarper(config["perspective_warper"])
+
+    train_loader = FeatureMatchingDataLoader(
+        config["test"]["dataset"], feature_extractor, perspective_warper
+    )
+
+    superglue = SuperGlue(config["superglue"])
+    superglue.eval()
+    if torch.cuda.is_available():
+        superglue.cuda()  # make sure it trains on GPU
+    else:
+        print("### CUDA not available ###")
+
+    num_iters = len(train_loader)
+    prec_list = []
+    rec_list = []
+    print("num iters", num_iters)
+    for i, input in enumerate(pbar := tqdm(train_loader, total=num_iters)):
+        for k in input:
+            if k != "file_name" and k != "image0" and k != "image1":
+                if type(input[k]) == torch.Tensor:
+                    input[k] = Variable(input[k].cuda())
+                else:
+                    input[k] = Variable(torch.stack(input[k]).cuda())
+
+        output = superglue(input)  # originally not .float()
+        batch_size = input["partial_assignment_matrix"].shape[0]
+        for b in range(batch_size):
+            prec, rec = compute_precision_recall(
+                input["partial_assignment_matrix"][b], output["matches0"][b]
+            )
+            prec_list.append(prec)
+            rec_list.append(rec)
+        pbar.set_description(
+            f"p {torch.stack(prec_list).mean()} r {torch.stack(rec_list).mean()}"
+        )
+    prec_mean = torch.stack(prec_list).mean()
+    rec_mean = torch.stack(rec_list).mean()
+    print("Final precison:", prec_mean.item())
+    print("Final recall:", rec_mean.item())
+
+
+def construct_confusion_matrix(input_partial_assignment_matrix, output_matches0):
+    input_assignment_matrix = input_partial_assignment_matrix[:-1, :-1]
+    output_assignment_matrix = torch.zeros_like(input_assignment_matrix)
+    for i in range(len(output_matches0)):
+        if not output_matches0[i] == -1:
+            output_assignment_matrix[i, output_matches0[i]] = 1
+
+    mutual_assignment_matrix = torch.logical_and(
+        input_assignment_matrix, output_assignment_matrix
+    )
+
+    TP = torch.sum(mutual_assignment_matrix)
+
+    FP = torch.sum(output_assignment_matrix) - TP
+
+    FN = torch.sum(input_assignment_matrix) - TP
+
+    confusion_matrix = torch.zeros((2, 2))
+    confusion_matrix[0, 0] = TP
+    confusion_matrix[0, 1] = FP
+    confusion_matrix[1, 0] = FN
+
+    return confusion_matrix
+
+
+def compute_precision_recall(input_partial_assignment_matrix, output_matches0):
+    confusion_matrix = construct_confusion_matrix(
+        input_partial_assignment_matrix, output_matches0
+    )
+
+    TP = confusion_matrix[0, 0]
+    FP = confusion_matrix[0, 1]
+    FN = confusion_matrix[1, 0]
+
+    precision = TP / (TP + FP)
+    if TP + FN == 0:
+        recall = torch.tensor(0)
+    else:
+        recall = TP / (TP + FN)
+
+    return precision, recall
+
+
 def aggregate_configs(opt, config, config_model):
     import warnings
 
@@ -288,6 +361,7 @@ def aggregate_configs(opt, config, config_model):
     # Unify ...
     # - batch_size
     config["train"]["dataset"]["batch_size"] = config["superglue"]["batch_size"]
+    # config["test"]["dataset"]["batch_size"] = config["superglue"]["batch_size"]
     # - descriptor_dim
     for key in ["descriptor_dim", "max_keypoints"]:
         if config["feature_extraction"][key] != config["superglue"][key]:
@@ -311,14 +385,22 @@ def main():
     print(config)
     print(config["superglue"])
 
+    assert not (
+        config["opencv_display"] and not config["viz"]
+    ), "Must use --viz with --opencv_display"
+    assert not (
+        config["opencv_display"] and not config["fast_viz"]
+    ), "Cannot use --opencv_display without --fast_viz"
+    assert not (
+        config["fast_viz"] and not config["viz"]
+    ), "Must use --viz with --fast_viz"
+    assert not (
+        config["fast_viz"] and config["viz_extension"] == "pdf"
+    ), "Cannot use pdf extension with --fast_viz"
+
     if config["mode"] == "train":
         train(config)
     elif config["mode"] == "test":
-        # test(
-        #     opt,
-        #     get_superglue_config(config, config["superglue"]["load_epoch"]),
-        #     get_model_ckpt_path(opt, config["superglue"]["load_epoch"]),
-        # )
         test(config)
 
 

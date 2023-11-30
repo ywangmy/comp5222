@@ -5,5 +5,5 @@ descriptor_dim: 128
 model_name: ori
 num_gnn_layers: 9
 graph_type: 2
-edge_pool: None
+edge_pool:
 batch_size: 32
