@@ -894,16 +894,16 @@ class SuperGlue(nn.Module):
                 # print(torch.log(scores[b][i][y].exp()).item(), torch.log(scores[b][y][i].exp()).item())
                 if y != num_nodes:
                     # loss.append(-0.5 * torch.log(scores[b][i][y].exp()))
-                    loss.append(-0.5 * torch.log(scores[b][i][y]))
+                    loss.append(-0.5 * scores[b][i][y])
                 else:
                     # loss.append(-torch.log(scores[b][i][y].exp()))
-                    loss.append(-torch.log(scores[b][i][y]))
+                    loss.append(-scores[b][i][y])
                 if x != num_nodes:
                     # loss.append(-0.5 * torch.log(scores[b][x][i].exp()))
-                    loss.append(-0.5 * torch.log(scores[b][x][i]))
+                    loss.append(-0.5 * scores[b][x][i])
                 else:
                     # loss.append(-torch.log(scores[b][x][i].exp()))
-                    loss.append(-torch.log(scores[b][x][i]))
+                    loss.append(-scores[b][x][i])
                 # print(loss[-1].item())
                 # print('-----')
             loss_pt = torch.stack(loss)

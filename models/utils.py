@@ -286,7 +286,7 @@ def read_image(path, resize, rotation, resize_float):
 def read_image_modified(image, resize, resize_float):
     if image is None:
         return None, None, None
-    print(image.shape)
+    # print(image.shape)
     w, h = image.shape[1], image.shape[0]
     w_new, h_new = process_resize(w, h, resize)
     scales = (float(w) / float(w_new), float(h) / float(h_new))

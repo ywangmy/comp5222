@@ -48,7 +48,7 @@ feature_extraction:
     extractor: SIFT
 
     SIFT:
-        contrast_threshold: 0.00001
+        contrast_threshold: 0.0001
         edge_threshold: 10
         sigma: 1.6
 
